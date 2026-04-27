@@ -1,0 +1,3656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lost in the Beis Medrash • SQL Seder</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+<style>
+/* ============ DESIGN TOKENS ============ */
+:root {
+  --parchment-dark:   #1c130a;
+  --parchment-mid:    #2a1d10;
+  --parchment-light:  #3d2a18;
+  --parchment-paper:  #f5e6c8;
+  --parchment-aged:   #e8d5a0;
+  --gold:             #cca300;
+  --gold-bright:      #f0c842;
+  --gold-dim:         #8a6e00;
+  --ink:              #f0e6d0;
+  --ink-faint:        #c8b896;
+  --crimson:          #8b1a1a;
+  --forest:           #1a5c2a;
+  --sapphire:         #1a3a6b;
+  --terminal-bg:      #0d0805;
+  --terminal-text:    #e8d5a0;
+  --sql-keyword:      #f0c842;
+  --sql-string:       #6ddc8f;
+  --sql-number:       #79b8ff;
+  --sql-comment:      #7a7060;
+  --sql-function:     #e8956d;
+  --correct:          #6ddc8f;
+  --wrong:            #e05555;
+  --xp-bar:           #c8a000;
+  --shadow-deep:      rgba(0,0,0,0.8);
+}
+
+/* ============ RESET & BASE ============ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: 'IM Fell English', Georgia, serif;
+  font-size: 18px;
+  background: var(--parchment-dark);
+  color: var(--ink);
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(100,60,10,0.15) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(60,30,5,0.2) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+}
+
+/* ============ SCROLLBAR STYLING ============ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--parchment-dark); }
+::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 3px; }
+
+/* ============ LAYOUT SHELL ============ */
+#app-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: 60px 1fr;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ============ TOP HEADER BAR ============ */
+#header-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--parchment-mid);
+  border-bottom: 2px solid var(--gold);
+  padding: 0 20px;
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.6);
+}
+#header-bar::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+}
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.header-logo h1 {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 0.85em;
+  color: var(--gold-bright);
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 20px rgba(240,200,66,0.4);
+  line-height: 1.2;
+}
+.header-logo h1 span { 
+  display: block; 
+  font-size: 0.7em;
+  color: var(--gold-dim);
+  font-family: 'IM Fell English', serif;
+  font-weight: normal;
+}
+#header-status {
+  font-size: 0.85em;
+  color: var(--gold);
+  letter-spacing: 0.05em;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+#header-status.visible { opacity: 1; }
+
+/* ============ SIDEBAR ============ */
+#sidebar {
+  grid-column: 1;
+  grid-row: 2;
+  background: var(--parchment-mid);
+  border-right: 1px solid rgba(204,163,0,0.3);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  position: relative;
+}
+#sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+
+.sidebar-panel {
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(204,163,0,0.2);
+  border-radius: 4px;
+  padding: 14px;
+  position: relative;
+}
+.sidebar-panel-title {
+  font-size: 0.7em;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(204,163,0,0.15);
+  padding-bottom: 6px;
+}
+
+/* Avatar block */
+#avatar-display {
+  text-align: center;
+}
+#avatar-emoji {
+  font-size: 3.5em;
+  display: block;
+  line-height: 1;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 0 12px rgba(204,163,0,0.4));
+  transition: transform 0.3s ease;
+}
+#avatar-emoji:hover { transform: scale(1.1) rotate(-3deg); }
+#avatar-name {
+  font-size: 1em;
+  color: var(--gold-bright);
+  font-style: italic;
+}
+#avatar-title {
+  font-size: 0.75em;
+  color: var(--ink-faint);
+  margin-top: 4px;
+}
+
+/* XP / Madreiga */
+.xp-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 5px;
+}
+.xp-label span:first-child { font-size: 0.85em; color: var(--ink-faint); }
+.xp-label span:last-child { font-size: 0.9em; color: var(--gold); font-weight: bold; }
+
+.xp-bar-track {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(204,163,0,0.2);
+  border-radius: 3px;
+  height: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.xp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-dim), var(--gold-bright));
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+}
+.xp-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 40%;
+  background: rgba(255,255,255,0.3);
+  border-radius: 3px 3px 0 0;
+}
+#madreiga-label {
+  font-size: 0.9em;
+  color: var(--gold);
+  text-align: center;
+  font-style: italic;
+}
+
+/* Zman Progress */
+.zman-perek-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.zman-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--gold-dim);
+  background: rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--gold-dim);
+  transition: all 0.4s ease;
+  position: relative;
+}
+.zman-dot.completed {
+  background: var(--gold);
+  border-color: var(--gold-bright);
+  color: var(--parchment-dark);
+  box-shadow: 0 0 8px rgba(204,163,0,0.5);
+}
+.zman-dot.current {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 0 2px rgba(204,163,0,0.3);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(204,163,0,0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(204,163,0,0.1), 0 0 12px rgba(204,163,0,0.4); }
+}
+
+/* Chazal Quote box */
+.chazal-box {
+  font-style: italic;
+  font-size: 0.82em;
+  color: var(--ink-faint);
+  line-height: 1.5;
+  text-align: center;
+  position: relative;
+  padding: 0 12px;
+}
+.chazal-box::before, .chazal-box::after {
+  content: '"';
+  font-size: 2em;
+  color: var(--gold-dim);
+  position: absolute;
+  line-height: 0.5;
+}
+.chazal-box::before { top: 5px; left: 0; }
+.chazal-box::after { content: '"'; bottom: -5px; right: 0; }
+
+/* ============ MAIN CONTENT AREA ============ */
+#main-area {
+  grid-column: 2;
+  grid-row: 2;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* ============ SCREENS (CHARACTER PICKER / BACKSTORY / GAME / SIYUM) ============ */
+.screen {
+  position: absolute;
+  inset: 0;
+  padding: 24px;
+  overflow-y: auto;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.screen.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+/* ============ CHARACTER PICKER ============ */
+#screen-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.picker-card {
+  background: var(--parchment-mid);
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  padding: 36px 40px;
+  max-width: 520px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  position: relative;
+}
+.picker-card::before {
+  content: '✦ ✦ ✦';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--parchment-mid);
+  padding: 0 12px;
+  font-size: 0.7em;
+  color: var(--gold);
+  letter-spacing: 8px;
+}
+.picker-card h2 {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1em;
+  color: var(--gold-bright);
+  margin-bottom: 24px;
+  letter-spacing: 0.05em;
+}
+.avatar-grid {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+.avatar-btn {
+  font-size: 3em;
+  cursor: pointer;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: rgba(0,0,0,0.3);
+  transition: all 0.2s ease;
+  position: relative;
+}
+.avatar-btn::after {
+  content: attr(data-label);
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.25em;
+  font-family: 'IM Fell English', serif;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.avatar-btn:hover { transform: scale(1.1) translateY(-4px); border-color: var(--gold-dim); }
+.avatar-btn.selected {
+  border-color: var(--gold-bright);
+  background: rgba(204,163,0,0.15);
+  box-shadow: 0 0 20px rgba(204,163,0,0.3);
+}
+.name-input-wrap {
+  margin: 28px 0 24px;
+  position: relative;
+}
+.name-input-wrap label {
+  display: block;
+  font-size: 0.75em;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin-bottom: 8px;
+}
+#name-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--gold-dim);
+  color: var(--ink);
+  font-family: 'IM Fell English', serif;
+  font-size: 1.1em;
+  border-radius: 4px;
+  text-align: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+#name-input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(204,163,0,0.25);
+}
+
+/* ============ BACKSTORY SCREEN ============ */
+#screen-backstory {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 30px;
+}
+.backstory-card {
+  background: var(--parchment-mid);
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  padding: 36px 40px;
+  max-width: 680px;
+  width: 100%;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+.backstory-card h2 {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1.2em;
+  color: var(--gold-bright);
+  text-align: center;
+  margin-bottom: 20px;
+}
+.backstory-card p {
+  font-size: 1em;
+  line-height: 1.75;
+  color: var(--ink);
+  text-align: justify;
+}
+.backstory-card p em { color: var(--gold); font-style: italic; }
+.backstory-card p strong { color: var(--gold-bright); }
+
+/* ============ GAME SCREEN ============ */
+#screen-game {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.game-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 20px;
+  gap: 12px;
+}
+
+/* Narrative box */
+#narrative-box {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid rgba(204,163,0,0.2);
+  border-radius: 6px;
+  padding: 16px 20px;
+  font-size: 1em;
+  line-height: 1.75;
+  color: var(--ink);
+  min-height: 80px;
+  max-height: 160px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  position: relative;
+}
+#narrative-box em { color: var(--gold); }
+#narrative-box strong { color: var(--gold-bright); }
+.narrative-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--gold);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 0.7s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Task panel */
+#task-panel {
+  background: var(--parchment-light);
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  padding: 14px 16px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+#task-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--gold);
+}
+#task-title-display {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 0.85em;
+  color: var(--gold-bright);
+  margin-bottom: 8px;
+  letter-spacing: 0.04em;
+}
+.schema-display {
+  background: var(--terminal-bg);
+  color: #79b8ff;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.8em;
+  padding: 8px 12px;
+  border-radius: 3px;
+  border-left: 3px solid var(--gold-dim);
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+}
+#task-desc-display {
+  font-size: 0.9em;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+#task-desc-display em { color: var(--gold); }
+
+/* ============ SQL TERMINAL / IDE ============ */
+#terminal-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--terminal-bg);
+  border: 1px solid rgba(204,163,0,0.25);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+.terminal-titlebar {
+  background: rgba(204,163,0,0.08);
+  border-bottom: 1px solid rgba(204,163,0,0.15);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.terminal-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+.dot-red { background: #e05555; }
+.dot-yellow { background: var(--gold); }
+.dot-green { background: #6ddc8f; }
+.terminal-label {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.7em;
+  color: var(--gold-dim);
+  margin-left: 8px;
+  letter-spacing: 0.08em;
+}
+.terminal-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+.line-numbers {
+  background: rgba(204,163,0,0.04);
+  border-right: 1px solid rgba(204,163,0,0.1);
+  padding: 12px 8px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.85em;
+  color: var(--sql-comment);
+  text-align: right;
+  user-select: none;
+  min-width: 36px;
+  line-height: 1.5em;
+  flex-shrink: 0;
+}
+/* The hidden textarea + overlay highlighter pattern */
+.editor-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+#query-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--gold-bright);
+  border: none;
+  padding: 12px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.9em;
+  line-height: 1.5em;
+  resize: none;
+  z-index: 2;
+  outline: none;
+  spellcheck: false;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow: auto;
+}
+#highlight-overlay {
+  position: absolute;
+  inset: 0;
+  padding: 12px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.9em;
+  line-height: 1.5em;
+  color: var(--terminal-text);
+  pointer-events: none;
+  z-index: 1;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow: hidden;
+  word-break: keep-all;
+}
+/* SQL Syntax highlight classes */
+.sql-keyword { color: var(--sql-keyword); font-weight: bold; }
+.sql-string   { color: var(--sql-string); }
+.sql-number   { color: var(--sql-number); }
+.sql-comment  { color: var(--sql-comment); font-style: italic; }
+.sql-function { color: var(--sql-function); }
+.sql-operator { color: #e8956d; }
+
+/* ============ CONTROL BAR ============ */
+#control-bar {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0,0,0,0.2);
+  flex-wrap: wrap;
+}
+
+/* ============ BUTTONS ============ */
+.btn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'IM Fell English', serif;
+  font-size: 0.9em;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  transition: all 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0);
+  transition: background 0.15s ease;
+}
+.btn:hover::after { background: rgba(255,255,255,0.08); }
+.btn:active { transform: scale(0.97); }
+
+.btn-primary {
+  background: linear-gradient(180deg, #ddb800 0%, #a88b00 100%);
+  color: #1a0e00;
+  box-shadow: 0 2px 8px rgba(204,163,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.btn-primary:hover { box-shadow: 0 4px 16px rgba(204,163,0,0.5); }
+
+.btn-hint {
+  background: rgba(204,163,0,0.1);
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+}
+.btn-hint:hover { background: rgba(204,163,0,0.2); }
+
+.btn-next {
+  background: linear-gradient(180deg, #2e7d3d 0%, #1a5c2a 100%);
+  color: #e8ffe8;
+  box-shadow: 0 2px 8px rgba(30,100,50,0.4);
+  display: none;
+  font-size: 1em;
+  padding: 10px 22px;
+}
+.btn-next.visible { display: inline-block; }
+.btn-next:hover { box-shadow: 0 4px 16px rgba(30,100,50,0.6); }
+
+.btn-branch {
+  background: linear-gradient(180deg, #1a3a6b 0%, #0d2040 100%);
+  color: #c8d8ff;
+  border: 1px solid rgba(100,140,220,0.3);
+  flex: 1;
+  font-size: 0.95em;
+  padding: 10px 14px;
+  box-shadow: 0 2px 8px rgba(20,40,100,0.4);
+  display: none;
+}
+.btn-branch.visible { display: inline-block; }
+.btn-branch:hover { box-shadow: 0 4px 16px rgba(20,40,100,0.6); }
+
+.btn-start, .btn-enter {
+  background: linear-gradient(180deg, #ddb800 0%, #a88b00 100%);
+  color: #1a0e00;
+  font-size: 1.1em;
+  padding: 12px 28px;
+  box-shadow: 0 4px 16px rgba(204,163,0,0.4);
+  margin-top: 20px;
+  border-radius: 4px;
+}
+.btn-start:hover, .btn-enter:hover {
+  box-shadow: 0 6px 24px rgba(204,163,0,0.6);
+  transform: translateY(-1px);
+}
+
+/* ============ RESULT AREA ============ */
+#result-area {
+  max-height: 150px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  display: none;
+}
+.result-inner {
+  padding: 10px 12px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(204,163,0,0.15);
+  border-radius: 4px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.85em;
+}
+.feedback-correct {
+  color: var(--correct);
+  font-family: 'IM Fell English', serif;
+  font-size: 1.05em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.feedback-wrong {
+  color: var(--wrong);
+  font-family: 'IM Fell English', serif;
+  font-size: 1.05em;
+  margin-bottom: 8px;
+}
+.result-table { border-collapse: collapse; width: 100%; margin-top: 6px; }
+.result-table th {
+  background: rgba(204,163,0,0.15);
+  border: 1px solid rgba(204,163,0,0.3);
+  padding: 5px 10px;
+  color: var(--gold);
+  font-weight: bold;
+  text-align: left;
+}
+.result-table td {
+  border: 1px solid rgba(204,163,0,0.15);
+  padding: 4px 10px;
+  color: var(--ink-faint);
+}
+.result-table tr:hover td { background: rgba(204,163,0,0.05); }
+
+/* ============ HINT / REVEAL PANEL ============ */
+#hint-reveal-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.15);
+  border-top: 1px solid rgba(204,163,0,0.1);
+  flex-shrink: 0;
+  font-size: 0.8em;
+  color: var(--ink-faint);
+  flex-wrap: wrap;
+}
+#hint-reveal-bar strong {
+  color: var(--gold);
+  font-style: italic;
+}
+#echad-input {
+  width: 50px;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid var(--gold-dim);
+  color: var(--ink);
+  font-family: 'Courier Prime', monospace;
+  font-size: 1em;
+  text-align: center;
+  border-radius: 3px;
+}
+#echad-input:focus { outline: none; border-color: var(--gold); }
+.btn-reveal {
+  background: rgba(139,26,26,0.3);
+  color: #ffaaaa;
+  border: 1px solid rgba(139,26,26,0.5);
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: 'IM Fell English', serif;
+  font-size: 0.9em;
+  transition: background 0.15s ease;
+}
+.btn-reveal:hover { background: rgba(139,26,26,0.5); }
+
+/* ============ SIYUM SCREEN ============ */
+#screen-siyum {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.siyum-card {
+  text-align: center;
+  max-width: 640px;
+  padding: 40px;
+}
+.siyum-card h1 {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1.8em;
+  color: var(--gold-bright);
+  margin-bottom: 16px;
+  text-shadow: 0 0 30px rgba(240,200,66,0.5);
+  animation: glow-text 2s ease-in-out infinite alternate;
+}
+@keyframes glow-text {
+  from { text-shadow: 0 0 10px rgba(240,200,66,0.4); }
+  to   { text-shadow: 0 0 30px rgba(240,200,66,0.7), 0 0 60px rgba(240,200,66,0.3); }
+}
+.siyum-card p {
+  font-size: 1.1em;
+  line-height: 1.75;
+  color: var(--ink);
+  margin-bottom: 20px;
+}
+
+/* ============ CHAPTER TRANSITION OVERLAY ============ */
+#chapter-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--parchment-dark);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+#chapter-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+.chapter-flash-text {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 2em;
+  color: var(--gold-bright);
+  text-align: center;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+#chapter-overlay.active .chapter-flash-text {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ============ CONFETTI CANVAS ============ */
+#confetti-canvas {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  display: none;
+}
+
+/* ============ HINT TOAST ============ */
+#hint-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--parchment-light);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  padding: 16px 20px;
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  z-index: 500;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+#hint-toast.visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+.hint-toast-head {
+  font-size: 0.75em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin-bottom: 6px;
+}
+.hint-toast-body {
+  font-size: 0.95em;
+  color: var(--ink);
+  line-height: 1.5;
+}
+.hint-toast-close {
+  position: absolute;
+  top: 8px; right: 10px;
+  background: none;
+  border: none;
+  color: var(--gold-dim);
+  font-size: 1.1em;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ============ UTILITY ============ */
+.hidden { display: none !important; }
+.ornament-divider {
+  text-align: center;
+  color: var(--gold-dim);
+  font-size: 0.8em;
+  letter-spacing: 12px;
+  margin: 16px 0;
+}
+.branch-row {
+  display: none;
+  gap: 10px;
+  width: 100%;
+}
+.branch-row.visible { display: flex; }
+
+/* ============ OTZAR (INVENTORY) ============ */
+#otzar-panel .sidebar-panel-title { cursor: pointer; user-select: none; }
+#otzar-panel .sidebar-panel-title::after { content: ' ▾'; font-size: 0.8em; }
+.otzar-shelf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 30px;
+}
+.sefer-item {
+  position: relative;
+  font-size: 1.4em;
+  cursor: pointer;
+  transition: transform 0.2s ease, filter 0.2s ease;
+  filter: drop-shadow(0 0 4px rgba(204,163,0,0.3));
+}
+.sefer-item:hover { transform: scale(1.3) translateY(-4px); }
+.sefer-item.new-item {
+  animation: sefer-arrive 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes sefer-arrive {
+  from { transform: scale(0) rotate(-20deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0deg);   opacity: 1; }
+}
+.sefer-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--parchment-light);
+  border: 1px solid var(--gold);
+  border-radius: 5px;
+  padding: 8px 10px;
+  width: 190px;
+  font-size: 0.38em;
+  font-family: 'IM Fell English', serif;
+  color: var(--ink);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 200;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+  line-height: 1.4;
+}
+.sefer-item:hover .sefer-tooltip { opacity: 1; }
+.sefer-tooltip strong { color: var(--gold-bright); display: block; margin-bottom: 4px; font-size: 1.1em; }
+.sefer-tooltip em { color: var(--gold); }
+.otzar-empty {
+  font-size: 0.78em;
+  color: var(--ink-faint);
+  font-style: italic;
+  text-align: center;
+  padding: 6px 0;
+}
+
+/* Item earn toast (slides from left) */
+#item-earn-toast {
+  position: fixed;
+  top: 80px;
+  left: -360px;
+  width: 340px;
+  background: var(--parchment-light);
+  border: 1px solid var(--gold-bright);
+  border-radius: 8px;
+  padding: 14px 18px;
+  z-index: 600;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+  transition: left 0.5s cubic-bezier(0.34,1.3,0.64,1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+#item-earn-toast.visible { left: 20px; }
+.item-earn-emoji { font-size: 2.4em; flex-shrink: 0; }
+.item-earn-text strong { color: var(--gold-bright); display: block; font-size: 1em; margin-bottom: 3px; }
+.item-earn-text span { font-size: 0.8em; color: var(--ink-faint); line-height: 1.4; }
+
+/* ============ BOSS FARHER MODAL ============ */
+#farher-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  z-index: 800;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#farher-modal.active { display: flex; }
+.farher-card {
+  background: var(--parchment-mid);
+  border: 2px solid var(--gold-bright);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px 32px;
+  box-shadow: 0 0 60px rgba(204,163,0,0.3);
+  position: relative;
+}
+.farher-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid rgba(204,163,0,0.3);
+  padding-bottom: 14px;
+}
+.farher-avatar { font-size: 3em; }
+.farher-header-text h2 {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1em;
+  color: var(--gold-bright);
+  margin-bottom: 3px;
+}
+.farher-header-text p { font-size: 0.85em; color: var(--ink-faint); line-height: 1.4; }
+
+/* Timer ring */
+.timer-ring-wrap {
+  margin: 0 auto 16px;
+  width: 90px;
+  height: 90px;
+  position: relative;
+}
+.timer-ring-wrap svg { transform: rotate(-90deg); }
+#farher-timer-ring {
+  stroke-dasharray: 251.2;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear, stroke 0.3s ease;
+}
+.timer-number {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Courier Prime', monospace;
+  font-size: 1.6em;
+  font-weight: bold;
+  color: var(--gold-bright);
+}
+.timer-number.danger { color: var(--wrong); animation: shake-num 0.3s ease infinite alternate; }
+@keyframes shake-num { from { transform: translateX(-2px); } to { transform: translateX(2px); } }
+
+.farher-q-progress {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.farher-q-dot {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--gold-dim);
+  background: rgba(0,0,0,0.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7em;
+  color: var(--gold-dim);
+  transition: all 0.3s ease;
+}
+.farher-q-dot.active { border-color: var(--gold-bright); color: var(--gold-bright); box-shadow: 0 0 8px rgba(204,163,0,0.4); }
+.farher-q-dot.passed { background: var(--correct); border-color: var(--correct); color: #001a00; }
+.farher-q-dot.failed { background: var(--wrong); border-color: var(--wrong); color: white; }
+
+.farher-question-box {
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(204,163,0,0.2);
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.farher-question-box .schema-display { margin-bottom: 8px; font-size: 0.78em; }
+.farher-task { font-size: 0.9em; color: var(--ink-faint); line-height: 1.5; margin-bottom: 10px; }
+.farher-task em { color: var(--gold); }
+.farher-task strong { color: var(--ink); }
+
+.farher-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+#farher-query-input {
+  flex: 1;
+  background: var(--terminal-bg);
+  color: var(--terminal-text);
+  border: 1px solid var(--gold-dim);
+  padding: 8px 10px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.85em;
+  border-radius: 4px;
+  resize: none;
+  height: 60px;
+  caret-color: var(--gold-bright);
+}
+#farher-query-input:focus { outline: none; border-color: var(--gold); }
+.farher-result-msg {
+  margin-top: 8px;
+  font-size: 0.9em;
+  min-height: 20px;
+  font-style: italic;
+}
+.farher-result-msg.ok { color: var(--correct); }
+.farher-result-msg.bad { color: var(--wrong); }
+
+.farher-outcome {
+  text-align: center;
+  padding: 20px 0;
+  display: none;
+}
+.farher-outcome.active { display: block; }
+.farher-outcome h3 {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1.3em;
+  margin-bottom: 12px;
+}
+.farher-outcome.pass h3 { color: var(--correct); }
+.farher-outcome.fail h3 { color: var(--wrong); }
+.farher-outcome p { font-size: 0.95em; color: var(--ink-faint); line-height: 1.6; margin-bottom: 16px; }
+
+/* ============ MASHGIACH POPUP ============ */
+#mashgiach-popup {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  width: min(500px, 90vw);
+  background: var(--parchment-mid);
+  border: 1px solid var(--crimson);
+  border-radius: 10px;
+  padding: 16px 20px;
+  z-index: 550;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  box-shadow: 0 8px 40px rgba(139,26,26,0.4);
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+#mashgiach-popup.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+.mashgiach-face {
+  font-size: 2.4em;
+  flex-shrink: 0;
+  animation: wobble-face 1.5s ease-in-out infinite;
+}
+@keyframes wobble-face {
+  0%,100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
+}
+.mashgiach-bubble { flex: 1; }
+.mashgiach-bubble .m-label {
+  font-size: 0.7em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #cc6666;
+  margin-bottom: 5px;
+}
+.mashgiach-bubble .m-text {
+  font-size: 0.9em;
+  color: var(--ink);
+  line-height: 1.55;
+}
+.mashgiach-bubble .m-text em { color: var(--gold); }
+.mashgiach-bubble .m-text code {
+  font-family: 'Courier Prime', monospace;
+  background: rgba(0,0,0,0.3);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--sql-string);
+  font-size: 0.9em;
+}
+.mashgiach-close {
+  position: absolute;
+  top: 8px; right: 10px;
+  background: none;
+  border: none;
+  color: var(--gold-dim);
+  font-size: 1em;
+  cursor: pointer;
+}
+
+/* ============ ECHAD MI YODEA TRIVIA (dynamic) ============ */
+.echad-trivia-area {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.echad-category-badge {
+  font-size: 0.7em;
+  background: rgba(204,163,0,0.12);
+  border: 1px solid var(--gold-dim);
+  border-radius: 10px;
+  padding: 1px 7px;
+  color: var(--gold-dim);
+  flex-shrink: 0;
+}
+
+/* Boss warning flash on screen edge */
+.boss-incoming-flash {
+  position: fixed;
+  inset: 0;
+  border: 4px solid var(--gold-bright);
+  pointer-events: none;
+  z-index: 790;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  box-shadow: inset 0 0 60px rgba(204,163,0,0.2);
+}
+.boss-incoming-flash.active { opacity: 1; }
+
+/* ============ MULTIMEDIA: BEIS MEDRASH SVG ============ */
+#beis-medrash-svg {
+  transition: filter 0.3s ease;
+  border-radius: 4px;
+}
+#beis-medrash-svg:hover {
+  filter: drop-shadow(0 0 8px rgba(240,200,66,0.6));
+  transform: scale(1.05);
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+#beis-medrash-svg .bm-win-glow {
+  transition: opacity 0.15s ease;
+}
+
+/* ============ MULTIMEDIA: SVG AVATAR ============ */
+#rosh-chabura-svg {
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1),
+              filter 0.3s ease;
+}
+#rosh-chabura-svg:hover {
+  filter: drop-shadow(0 0 16px rgba(204,163,0,0.4))
+          drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+}
+#avatar-mood {
+  min-height: 1.2em;
+  transition: opacity 0.3s ease;
+  font-size: 0.7em;
+  color: var(--gold-dim);
+  font-style: italic;
+  margin-top: 3px;
+  text-align: center;
+}
+
+/* Sound icon pulse when active */
+#bm-sound-icon {
+  transition: opacity 0.3s ease;
+}
+@keyframes sound-pulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.4; }
+}
+#bm-sound-icon[style*="opacity: 1"] {
+  animation: sound-pulse 1.5s ease-in-out infinite;
+}
+
+@media (max-width: 700px) {
+  #app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: 50px auto 1fr;
+  }
+  #sidebar {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 10px;
+    gap: 10px;
+    max-height: 100px;
+  }
+  #main-area {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .sidebar-panel { min-width: 140px; }
+  #avatar-display, .chazal-box { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ======== BOSS INCOMING FLASH ======== -->
+<div class="boss-incoming-flash" id="boss-flash"></div>
+
+<!-- ======== ITEM EARN TOAST ======== -->
+<div id="item-earn-toast">
+  <div class="item-earn-emoji" id="item-earn-emoji">📖</div>
+  <div class="item-earn-text">
+    <strong id="item-earn-name">Ketzos HaChoshen</strong>
+    <span id="item-earn-desc">Added to your Otzar!</span>
+  </div>
+</div>
+
+<!-- ======== MASHGIACH POPUP ======== -->
+<div id="mashgiach-popup">
+  <button class="mashgiach-close" onclick="closeMashgiach()">✕</button>
+  <div class="mashgiach-face">🧓</div>
+  <div class="mashgiach-bubble">
+    <div class="m-label">📢 Mashgiach Rabbi Gold</div>
+    <div class="m-text" id="mashgiach-text">Nu, bochur...</div>
+  </div>
+</div>
+
+<!-- ======== FARHER MODAL ======== -->
+<div id="farher-modal">
+  <div class="farher-card">
+    <div class="farher-header">
+      <div class="farher-avatar">👴</div>
+      <div class="farher-header-text">
+        <h2 id="farher-title">Rosh Yeshiva Farher</h2>
+        <p id="farher-subtitle">The Rosh Yeshiva will now test your SQL knowledge. Answer 3 queries before time runs out!</p>
+      </div>
+    </div>
+
+    <div class="timer-ring-wrap">
+      <svg width="90" height="90" viewBox="0 0 90 90">
+        <circle cx="45" cy="45" r="40" fill="none" stroke="rgba(204,163,0,0.15)" stroke-width="6"/>
+        <circle cx="45" cy="45" r="40" fill="none" stroke="#cca300" stroke-width="6"
+          id="farher-timer-ring" stroke-linecap="round"/>
+      </svg>
+      <div class="timer-number" id="farher-timer-num">90</div>
+    </div>
+
+    <div class="farher-q-progress" id="farher-q-dots">
+      <!-- Dots are generated dynamically by buildFarherDots() based on round.qs.length -->
+    </div>
+
+    <div class="farher-question-box" id="farher-question-box">
+      <div class="schema-display" id="farher-schema"></div>
+      <div class="farher-task" id="farher-task"></div>
+      <div class="farher-input-row">
+        <textarea id="farher-query-input" placeholder="-- Write your query..."></textarea>
+        <button class="btn btn-primary" style="height:60px;padding:0 14px;font-size:0.85em;" onclick="submitFarherQuery()">▶ Run</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+        <button id="farher-hint-btn" class="btn btn-hint" style="font-size:0.8em;padding:5px 12px;display:none;" onclick="useFarherHint()">💡 Hint (−15s)</button>
+        <div id="farher-hint-box" style="display:none;font-size:0.85em;color:var(--gold);font-style:italic;flex:1;line-height:1.4;"></div>
+      </div>
+      <div class="farher-result-msg" id="farher-result-msg"></div>
+    </div>
+
+    <!-- Outcome panel (shown on pass/fail) -->
+    <div class="farher-outcome" id="farher-outcome">
+      <h3 id="farher-outcome-title">Yashar Koach!</h3>
+      <p id="farher-outcome-text"></p>
+      <button class="btn btn-primary" id="farher-outcome-btn" onclick="closeFarher()">Continue the Zman ➡</button>
+      <button class="btn btn-hint" id="farher-continue-anyway-btn" style="display:none;margin-top:8px;" onclick="closeFarher()">Continue Anyway (no bonus XP) ➡</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== CHAPTER TRANSITION OVERLAY ======== -->
+<div id="chapter-overlay">
+  <div class="chapter-flash-text" id="chapter-flash-label">Perek 2</div>
+</div>
+
+<!-- ======== CONFETTI CANVAS ======== -->
+<canvas id="confetti-canvas"></canvas>
+
+<!-- ======== HINT TOAST ======== -->
+<div id="hint-toast">
+  <button class="hint-toast-close" onclick="closeHintToast()">✕</button>
+  <div class="hint-toast-head">💡 Hint <span id="hint-num">1</span> of 3</div>
+  <div class="hint-toast-body" id="hint-body"></div>
+</div>
+
+<!-- ======== APP SHELL ======== -->
+<div id="app-shell">
+
+  <!-- HEADER -->
+  <header id="header-bar">
+    <div class="header-logo">
+      <!-- Interactive Beis Medrash SVG — windows glow based on Kol Torah (XP score) -->
+      <svg id="beis-medrash-svg" width="72" height="52" viewBox="0 0 180 130" xmlns="http://www.w3.org/2000/svg" title="Beis Medrash of Ner Yisroel" style="cursor:pointer;flex-shrink:0;" onclick="toggleSoundscape()">
+        <defs>
+          <filter id="bm-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="candle-glow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="2.5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <!-- Sky gradient -->
+          <linearGradient id="sky-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0d0510"/>
+            <stop offset="100%" stop-color="#1c130a"/>
+          </linearGradient>
+          <!-- Window warm glow -->
+          <radialGradient id="win-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#ffe088" stop-opacity="1"/>
+            <stop offset="100%" stop-color="#cc8800" stop-opacity="0.3"/>
+          </radialGradient>
+        </defs>
+        <!-- Sky -->
+        <rect width="180" height="130" fill="url(#sky-grad)"/>
+        <!-- Stars (static, small) -->
+        <circle cx="10" cy="8" r="0.8" fill="white" opacity="0.6"/>
+        <circle cx="28" cy="5" r="0.6" fill="white" opacity="0.5"/>
+        <circle cx="155" cy="7" r="0.9" fill="white" opacity="0.7"/>
+        <circle cx="168" cy="12" r="0.6" fill="white" opacity="0.4"/>
+        <circle cx="140" cy="4" r="0.7" fill="white" opacity="0.6"/>
+        <circle cx="60" cy="6" r="0.5" fill="white" opacity="0.5"/>
+        <!-- Ground -->
+        <rect x="0" y="115" width="180" height="15" fill="#12080a"/>
+        <!-- Main building body -->
+        <rect x="15" y="55" width="150" height="62" fill="#2a1d10" stroke="#8a6e00" stroke-width="1.5"/>
+        <!-- Roof / Pediment -->
+        <polygon points="5,55 90,18 175,55" fill="#1c130a" stroke="#cca300" stroke-width="2"/>
+        <!-- Roof ridge ornament -->
+        <polygon points="82,22 90,10 98,22" fill="#cca300" opacity="0.9"/>
+        <!-- Left wing -->
+        <rect x="0" y="72" width="20" height="45" fill="#241808" stroke="#8a6e00" stroke-width="1"/>
+        <!-- Right wing -->
+        <rect x="160" y="72" width="20" height="45" fill="#241808" stroke="#8a6e00" stroke-width="1"/>
+        <!-- Door -->
+        <rect x="76" y="90" width="28" height="27" rx="14" fill="#0d0805" stroke="#cca300" stroke-width="1.5"/>
+        <line x1="90" y1="90" x2="90" y2="117" stroke="#cca300" stroke-width="0.8" opacity="0.6"/>
+        <!-- Door handle -->
+        <circle cx="85" cy="104" r="1.5" fill="#cca300"/>
+        <!-- Main windows — 6 windows, IDs for dynamic glow control -->
+        <!-- Row 1: top 3 windows -->
+        <rect class="bm-window" id="bmw-0" x="28" y="65" width="22" height="18" rx="11" fill="#110800" stroke="#8a6e00" stroke-width="1"/>
+        <rect class="bm-window" id="bmw-1" x="58" y="65" width="22" height="18" rx="11" fill="#110800" stroke="#8a6e00" stroke-width="1"/>
+        <rect class="bm-window" id="bmw-2" x="100" y="65" width="22" height="18" rx="11" fill="#110800" stroke="#8a6e00" stroke-width="1"/>
+        <rect class="bm-window" id="bmw-3" x="130" y="65" width="22" height="18" rx="11" fill="#110800" stroke="#8a6e00" stroke-width="1"/>
+        <!-- Row 2: lower 2 side windows -->
+        <rect class="bm-window" id="bmw-4" x="28" y="90" width="16" height="18" rx="8" fill="#110800" stroke="#8a6e00" stroke-width="1"/>
+        <rect class="bm-window" id="bmw-5" x="136" y="90" width="16" height="18" rx="8" fill="#110800" stroke="#8a6e00" stroke-width="1"/>
+        <!-- Glow overlays (opacity driven by JS) -->
+        <rect class="bm-win-glow" id="bmwg-0" x="28" y="65" width="22" height="18" rx="11" fill="url(#win-glow)" opacity="0" filter="url(#bm-glow)"/>
+        <rect class="bm-win-glow" id="bmwg-1" x="58" y="65" width="22" height="18" rx="11" fill="url(#win-glow)" opacity="0" filter="url(#bm-glow)"/>
+        <rect class="bm-win-glow" id="bmwg-2" x="100" y="65" width="22" height="18" rx="11" fill="url(#win-glow)" opacity="0" filter="url(#bm-glow)"/>
+        <rect class="bm-win-glow" id="bmwg-3" x="130" y="65" width="22" height="18" rx="11" fill="url(#win-glow)" opacity="0" filter="url(#bm-glow)"/>
+        <rect class="bm-win-glow" id="bmwg-4" x="28" y="90" width="16" height="18" rx="8" fill="url(#win-glow)" opacity="0" filter="url(#bm-glow)"/>
+        <rect class="bm-win-glow" id="bmwg-5" x="136" y="90" width="16" height="18" rx="8" fill="url(#win-glow)" opacity="0" filter="url(#bm-glow)"/>
+        <!-- Menorah / lamp post -->
+        <line x1="90" y1="14" x2="90" y2="22" stroke="#cca300" stroke-width="1.5"/>
+        <circle id="bm-menorah-flame" cx="90" cy="13" r="3.5" fill="#f0c842" filter="url(#candle-glow)" opacity="0.9"/>
+        <!-- Sound icon indicator -->
+        <g id="bm-sound-icon" transform="translate(158,4)" opacity="0.5">
+          <path d="M0,4 L3,4 L5,2 L5,8 L3,6 L0,6 Z" fill="#cca300" stroke="none"/>
+          <path d="M6,3 Q8,5 6,7" stroke="#cca300" stroke-width="0.8" fill="none"/>
+          <path d="M7,1.5 Q10,5 7,8.5" stroke="#cca300" stroke-width="0.8" fill="none" id="bm-sound-wave2"/>
+        </g>
+        <!-- Kol Torah label -->
+        <text x="90" y="128" font-family="Georgia,serif" font-size="6" fill="#8a6e00" text-anchor="middle">קוֹל תּוֹרָה</text>
+      </svg>
+      <h1>Lost in the Beis Medrash <span>SQL Seder • Interactive Shaila System</span></h1>
+    </div>
+    <div id="header-status"></div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    
+    <!-- Avatar Panel -->
+    <div class="sidebar-panel" id="avatar-panel">
+      <div class="sidebar-panel-title">Mashgiach</div>
+      <div id="avatar-display">
+        <!-- SVG Avatar — expression changes on success/error -->
+        <svg id="rosh-chabura-svg" width="72" height="80" viewBox="0 0 100 112" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto 8px;">
+          <defs>
+            <radialGradient id="face-grad" cx="50%" cy="40%" r="55%">
+              <stop offset="0%" stop-color="#f5ddb0"/>
+              <stop offset="100%" stop-color="#c8956a"/>
+            </radialGradient>
+            <filter id="avatar-glow">
+              <feGaussianBlur stdDeviation="2" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <!-- Hat (black fedora) -->
+          <ellipse cx="50" cy="26" rx="30" ry="5" fill="#1a1008"/>
+          <rect x="25" y="9" width="50" height="18" rx="6" fill="#1a1008"/>
+          <ellipse cx="50" cy="9" rx="22" ry="4" fill="#1a1008"/>
+          <!-- Hat band -->
+          <rect x="25" y="23" width="50" height="3" rx="1" fill="#8a6e00"/>
+          <!-- Face -->
+          <ellipse cx="50" cy="52" rx="24" ry="26" fill="url(#face-grad)"/>
+          <!-- Beard -->
+          <ellipse cx="50" cy="72" rx="20" ry="14" fill="#d4c9b0"/>
+          <!-- Ear left -->
+          <ellipse cx="26" cy="52" rx="4" ry="5" fill="#d4a870"/>
+          <!-- Ear right -->
+          <ellipse cx="74" cy="52" rx="4" ry="5" fill="#d4a870"/>
+          <!-- Eyes — controlled by JS class on svg -->
+          <!-- Neutral eyes (default) -->
+          <g id="av-eyes-neutral">
+            <ellipse cx="40" cy="47" rx="4" ry="4.5" fill="#2a1a08"/>
+            <ellipse cx="60" cy="47" rx="4" ry="4.5" fill="#2a1a08"/>
+            <circle cx="41.5" cy="45.5" r="1.2" fill="white" opacity="0.7"/>
+            <circle cx="61.5" cy="45.5" r="1.2" fill="white" opacity="0.7"/>
+          </g>
+          <!-- Happy eyes (smile state) — hidden by default -->
+          <g id="av-eyes-happy" visibility="hidden">
+            <path d="M36,47 Q40,43 44,47" stroke="#2a1a08" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <path d="M56,47 Q60,43 64,47" stroke="#2a1a08" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          </g>
+          <!-- Sad eyes (error state) — hidden by default -->
+          <g id="av-eyes-sad" visibility="hidden">
+            <path d="M36,45 Q40,49 44,45" stroke="#2a1a08" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <path d="M56,45 Q60,49 64,45" stroke="#2a1a08" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <!-- Tear -->
+            <ellipse cx="37" cy="51" rx="1.5" ry="2.5" fill="#6ab4e8" opacity="0.7"/>
+          </g>
+          <!-- Thinking eyes — hidden by default -->
+          <g id="av-eyes-thinking" visibility="hidden">
+            <ellipse cx="40" cy="47" rx="4" ry="4.5" fill="#2a1a08"/>
+            <ellipse cx="60" cy="47" rx="4" ry="4.5" fill="#2a1a08"/>
+            <circle cx="41.5" cy="45.5" r="1.2" fill="white" opacity="0.7"/>
+            <circle cx="61.5" cy="45.5" r="1.2" fill="white" opacity="0.7"/>
+            <!-- Eyebrow raised -->
+            <path d="M35,41 Q40,38 45,40" stroke="#5a3a10" stroke-width="1.8" fill="none"/>
+            <path d="M55,40 Q60,38 65,41" stroke="#5a3a10" stroke-width="1.8" fill="none"/>
+          </g>
+          <!-- Mouth — controlled by expression -->
+          <!-- Neutral mouth -->
+          <path id="av-mouth-neutral" d="M42,63 Q50,67 58,63" stroke="#8a4a20" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- Happy mouth -->
+          <path id="av-mouth-happy" d="M40,62 Q50,72 60,62" stroke="#8a4a20" stroke-width="2.5" fill="none" stroke-linecap="round" visibility="hidden"/>
+          <!-- Sad mouth -->
+          <path id="av-mouth-sad" d="M42,67 Q50,62 58,67" stroke="#8a4a20" stroke-width="2.5" fill="none" stroke-linecap="round" visibility="hidden"/>
+          <!-- Thinking mouth (side smirk) -->
+          <path id="av-mouth-thinking" d="M44,64 Q52,66 58,63" stroke="#8a4a20" stroke-width="2" fill="none" stroke-linecap="round" visibility="hidden"/>
+          <!-- Nose -->
+          <path d="M48,55 Q50,60 52,55" stroke="#b07040" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <!-- Glasses (for Rav avatar) -->
+          <g id="av-glasses" visibility="hidden">
+            <circle cx="40" cy="47" r="8" fill="none" stroke="#3a2a10" stroke-width="1.5"/>
+            <circle cx="60" cy="47" r="8" fill="none" stroke="#3a2a10" stroke-width="1.5"/>
+            <line x1="48" y1="47" x2="52" y2="47" stroke="#3a2a10" stroke-width="1.5"/>
+            <line x1="26" y1="47" x2="32" y2="47" stroke="#3a2a10" stroke-width="1.5"/>
+            <line x1="68" y1="47" x2="74" y2="47" stroke="#3a2a10" stroke-width="1.5"/>
+          </g>
+          <!-- Books under arm (always shown) -->
+          <rect x="68" y="88" width="28" height="7" rx="2" fill="#8b1a1a" stroke="#cca300" stroke-width="1"/>
+          <rect x="70" y="82" width="24" height="7" rx="2" fill="#1a3a6b" stroke="#cca300" stroke-width="1"/>
+          <!-- Body -->
+          <rect x="26" y="80" width="48" height="32" rx="8" fill="#1a1008"/>
+          <!-- Gartel (belt) -->
+          <rect x="26" y="96" width="48" height="3" fill="#3a2808"/>
+          <!-- XP Aura glow around head (shown when high XP) -->
+          <ellipse id="av-aura" cx="50" cy="50" rx="30" ry="32" fill="none" stroke="#f0c842" stroke-width="2" opacity="0" filter="url(#avatar-glow)"/>
+        </svg>
+        <div id="avatar-name">Reb Chaim</div>
+        <div id="avatar-title">Ben Torah</div>
+        <!-- Emotion label below avatar -->
+        <div id="avatar-mood" style="font-size:0.7em;color:var(--gold-dim);font-style:italic;margin-top:3px;">Thinking...</div>
+      </div>
+    </div>
+
+    <!-- Madreiga / XP -->
+    <div class="sidebar-panel" id="xp-panel">
+      <div class="sidebar-panel-title">Madreiga (Level)</div>
+      <div class="xp-label">
+        <span>Shteig Points</span>
+        <span id="xp-value">0 XP</span>
+      </div>
+      <div class="xp-bar-track">
+        <div class="xp-bar-fill" id="xp-bar" style="width:0%"></div>
+      </div>
+      <div id="madreiga-label">Bein Hazmanim (Beginner)</div>
+    </div>
+
+    <!-- Zman Progress -->
+    <div class="sidebar-panel" id="zman-panel">
+      <div class="sidebar-panel-title">Zman Progress</div>
+      <div class="zman-perek-dots" id="perek-dots">
+        <!-- dots injected by JS -->
+      </div>
+    </div>
+
+    <!-- Otzar (Inventory) -->
+    <div class="sidebar-panel" id="otzar-panel">
+      <div class="sidebar-panel-title" onclick="toggleOtzar()">הָאוֹצָר — Otzar</div>
+      <div class="otzar-shelf" id="otzar-shelf">
+        <div class="otzar-empty" id="otzar-empty">No seforim yet.<br><em style="font-size:0.9em">Earn them by shteiging!</em></div>
+      </div>
+    </div>
+
+    <!-- Chazal Quote -->
+    <div class="sidebar-panel" id="chazal-panel" style="margin-top: auto;">
+      <div class="sidebar-panel-title">Chazal</div>
+      <div class="chazal-box" id="chazal-quote">
+        Kol haschalos kashos — all beginnings are difficult.
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- MAIN AREA -->
+  <main id="main-area">
+
+    <!-- ===== CHARACTER PICKER SCREEN ===== -->
+    <div class="screen active" id="screen-picker">
+      <div class="picker-card">
+        <h2>Choose Your Mashgiach</h2>
+        <div class="avatar-grid">
+          <div class="avatar-btn selected" data-emoji="🎩" data-label="The Yeshivish" onclick="pickAvatar(this)">🎩</div>
+          <div class="avatar-btn" data-emoji="📚" data-label="The Masmid" onclick="pickAvatar(this)">📚</div>
+          <div class="avatar-btn" data-emoji="🕍" data-label="The Rav" onclick="pickAvatar(this)">🕍</div>
+        </div>
+        <div class="name-input-wrap">
+          <label for="name-input">Your Name</label>
+          <input id="name-input" type="text" placeholder="Reb Chaim" value="Reb Chaim" maxlength="24">
+        </div>
+        <div class="ornament-divider">✦ ✦ ✦</div>
+        <button class="btn btn-start" onclick="showBackstory()">Enter the Beis Medrash</button>
+      </div>
+    </div>
+
+    <!-- ===== BACKSTORY SCREEN ===== -->
+    <div class="screen" id="screen-backstory">
+      <div class="backstory-card">
+        <h2>The Great Database Churban</h2>
+        <div class="ornament-divider" style="margin:0 0 16px;">✦</div>
+        <p>
+          Welcome to Ner Yisroel. The year is 5786. The Kol Torah is booming in the Beis Medrash. However, disaster has struck the hanhala's office.<br><br>
+          Last night, during Mishmar, a well-meaning bochur attempted to install a "kosher filter" on the Mashgiach's main terminal. Instead, he accidentally executed a rogue script that scrambled the entire <em>Mesorah DB</em>—the central database holding the locations, chavrusas, and spiritual status of every bochur in the Yeshiva.<br><br>
+          Rabbi Gold, the venerable Mashgiach, is beside himself. "<em>Kol haschalos kashos</em>—all beginnings are difficult," he sighs, "but this is a churban! How can we keep the bochurim on the derech if we don't know who is missing first seder, who is schmoozing by the coffee, and who needs a chavrusa?"<br><br>
+          As a distinguished Mashgiach, you have been called upon. You know that <em>Derech Eretz Kadma L'Torah</em>, but right now, <strong>SQL Kadma L'Database!</strong> You must write exact queries to parse through the fragmented data, rescue the batlanim, pair up the masmidim, and navigate the tricky period before Bein Hazmanim.<br><br>
+          Are you ready to restore Seder to the Yeshiva?
+        </p>
+        <div style="text-align:center;">
+          <button class="btn btn-enter" onclick="startGame()">I am ready. Let's Shteig!</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== GAME SCREEN ===== -->
+    <div class="screen" id="screen-game">
+      <div class="game-inner">
+
+        <!-- Narrative -->
+        <div id="narrative-box"></div>
+
+        <!-- Task Panel -->
+        <div id="task-panel">
+          <div id="task-title-display"></div>
+          <div class="schema-display" id="schema-display"></div>
+          <div id="task-desc-display"></div>
+        </div>
+
+        <!-- SQL Terminal -->
+        <div id="terminal-panel">
+          <div class="terminal-titlebar">
+            <div class="terminal-dot dot-red"></div>
+            <div class="terminal-dot dot-yellow"></div>
+            <div class="terminal-dot dot-green"></div>
+            <span class="terminal-label">mesorah_db.sql — Query Editor</span>
+          </div>
+          <div class="terminal-body">
+            <div class="line-numbers" id="line-numbers">1</div>
+            <div class="editor-wrapper">
+              <div id="highlight-overlay"></div>
+              <textarea
+                id="query-input"
+                placeholder="-- Type your SQL shaila here..."
+                spellcheck="false"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+              ></textarea>
+            </div>
+          </div>
+          <div id="control-bar">
+            <button class="btn btn-primary" onclick="runQuery()">▶ PASKAN QUERY</button>
+            <button class="btn btn-hint" onclick="showHint()">💡 Hint</button>
+            <button id="next-btn" class="btn btn-next" onclick="nextChapter()">Next Perek ➡</button>
+            <div class="branch-row" id="branch-row">
+              <button class="btn btn-branch" onclick="goToBranch('A')">Path A: Bein Hazmanim 🌴</button>
+              <button class="btn btn-branch" onclick="goToBranch('B')">Path B: Shabbos Arrangements 🕯</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Result Area -->
+        <div id="result-area">
+          <div class="result-inner" id="result-inner"></div>
+        </div>
+
+        <!-- Hint/Reveal Bar -->
+        <div id="hint-reveal-bar">
+          <div class="echad-trivia-area">
+            <span>Stuck? Torah trivia:</span>
+            <span class="echad-category-badge" id="echad-category">Counting</span>
+            <strong id="echad-question">What number is...</strong>
+          </div>
+          <input type="text" id="echad-input" placeholder="#" maxlength="4" inputmode="numeric">
+          <button class="btn-reveal" onclick="revealAnswer()">Reveal</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ===== SIYUM SCREEN ===== -->
+    <div class="screen" id="screen-siyum">
+      <div class="siyum-card">
+        <h1>🎉 MAZEL TOV! SIYUM MASECHES SQL! 🎉</h1>
+        <svg width="90" height="90" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="margin:20px auto;display:block;">
+          <rect x="10" y="10" width="80" height="80" fill="none" stroke="#cca300" stroke-width="5" rx="4"/>
+          <rect x="20" y="20" width="60" height="60" fill="#2a1d10"/>
+          <text x="50" y="58" font-family="Georgia" font-size="28" fill="#cca300" text-anchor="middle" font-weight="bold">סיום</text>
+        </svg>
+        <p>
+          <em>Hadran Alach, Beis Medrash!</em> You have successfully written the queries, saved the bochurim from the klipos of bitul zman, and restored harmony to the Yeshiva. The Mashgiach is beaming, the Kol Torah is deafening, and there is extra potato kugel in the dining room in your honor.
+          <br><br>
+          <strong>Ashreicha! Talmud Torah K'neged Kulam!</strong>
+        </p>
+        <button class="btn btn-start" onclick="location.reload()">Start a New Zman (Play Again)</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.min.js"></script>
+<script>
+// ===================================================================
+// DATA & GAME STATE
+// ===================================================================
+let db, currentChapter = 1, captainName = "Reb Chaim", avatar = "🎩";
+let hintIndex = 0, nextPerekDest = null;
+let xp = 0, chaptersCompleted = [];
+let typeWriterTimer = null;
+let wrongAttempts = 0;          // dynamic difficulty counter
+let inventory = [];             // Otzar items
+let currentTrivia = null;       // active Echad Mi Yodea question
+
+// ── Boss Farher state ──────────────────────────────────────────────
+let farherActive = false, farherQIndex = 0, farherPassed = [false,false,false];
+let farherTimerInterval = null, farherTimeLeft = 90;
+let farherPendingNext = null;   // chapter to go to after farher resolves
+
+// ── Seforim inventory catalog ──────────────────────────────────────
+const SEFORIM_CATALOG = [
+  {
+    id: 'ketzos',
+    emoji: '📗',
+    name: 'Ketzos HaChoshen',
+    earnAt: 1,
+    hint: '<em>Ketzos</em> on JOINs: Use <code>SELECT * FROM a JOIN b ON a.id = b.id</code> to combine two tables that share a common column. Perfect for connecting related data!'
+  },
+  {
+    id: 'rambam',
+    emoji: '📘',
+    name: 'Mishneh Torah (SQL Ed.)',
+    earnAt: 3,
+    hint: 'The <em>Rambam</em> teaches: <code>ORDER BY col DESC</code> gives you highest first; <code>ORDER BY col ASC</code> gives lowest first. Always add DESC or ASC explicitly — be machmir!'
+  },
+  {
+    id: 'chofetz',
+    emoji: '📙',
+    name: 'Chofetz Chaim on Queries',
+    earnAt: 5,
+    hint: '<em>Shmiras haLashon</em> of SQL: <code>SELECT DISTINCT col</code> eliminates duplicate rows. Use it when you only want unique values — don\'t repeat yourself!'
+  },
+  {
+    id: 'maharsha',
+    emoji: '📕',
+    name: 'Maharsha\'s Chiddushim',
+    earnAt: 7,
+    hint: 'A Maharsha-level chiddush: <code>WHERE col LIKE \'%word%\'</code> finds any row containing that word anywhere. The <code>%</code> is a wildcard — like a kasha that matches everything!'
+  },
+  {
+    id: 'vilna',
+    emoji: '📓',
+    name: 'Vilna Gaon\'s Biur',
+    earnAt: 9,
+    hint: 'The <em>Gra\'s</em> clarity: <code>WHERE col BETWEEN 10 AND 20</code> is cleaner than writing <code>col >= 10 AND col <= 20</code>. Both work — the Gra preferred concision!'
+  },
+  {
+    id: 'nesivos',
+    emoji: '📔',
+    name: 'Nesivos HaMishpat',
+    earnAt: 11,
+    hint: 'Nesivos on aggregates: <code>SELECT COUNT(*), category FROM t GROUP BY category</code> counts items per group. Think of it as a chavrusa tally by masechta!'
+  },
+  {
+    id: 'shach',
+    emoji: '📒',
+    name: 'Shach\'s Sifsei Kohen',
+    earnAt: 13,
+    hint: 'The <em>Shach</em> on subqueries: <code>SELECT * FROM t WHERE col IN (SELECT col FROM t2 WHERE ...)</code> — a query inside a query. It\'s like a teshuvah inside a teshuvah!'
+  },
+  {
+    id: 'taz',
+    emoji: '🗒️',
+    name: 'Taz Turei Zahav',
+    earnAt: 15,
+    hint: 'The <em>Taz\'s</em> golden rule: <code>LIMIT n</code> at the end of any query returns only the first n rows. Use <code>LIMIT 1</code> to get just the top result!'
+  }
+];
+
+// ── Dynamic Torah Trivia pool ──────────────────────────────────────
+const TORAH_TRIVIA_POOL = [
+  // Counting / Numbers
+  { q: 'How many Imahos (Matriarchs) are there?',             a: 4,  cat: 'Avos & Imahos' },
+  { q: 'How many Avos (Patriarchs) are there?',               a: 3,  cat: 'Avos & Imahos' },
+  { q: 'How many Shevatim (Tribes) are there?',               a: 12, cat: 'Shevatim' },
+  { q: 'How many Sifrei Torah does a king write?',            a: 2,  cat: 'Melachim' },
+  { q: 'How many Dibros (Commandments) at Sinai?',            a: 10, cat: 'Matan Torah' },
+  { q: 'How many Sidrei Mishna are there?',                   a: 6,  cat: 'Mishna' },
+  { q: 'How many Masechtos are in Seder Moed?',               a: 12, cat: 'Mishna' },
+  { q: 'How many Masechtos are in Seder Nashim?',             a: 7,  cat: 'Mishna' },
+  { q: 'How many Luchos (tablets) did Moshe receive?',        a: 2,  cat: 'Matan Torah' },
+  { q: 'How many years was the Mishkan in the desert?',       a: 39, cat: 'Midbar' },
+  { q: 'How many years did Bnei Yisrael wander in the desert?', a: 40, cat: 'Midbar' },
+  { q: 'How many Middos of Torah interpretation (R\' Yishmael)?', a: 13, cat: 'Hermeneutics' },
+  { q: 'How many days of creation were there?',               a: 6,  cat: 'Bereishis' },
+  { q: 'On which day did Shabbos fall in creation?',          a: 7,  cat: 'Bereishis' },
+  { q: 'How many Korbanos (daily tamid) per day in the Beis HaMikdash?', a: 2, cat: 'Korbanos' },
+  { q: 'How many Yamim Tovim are in the Torah?',              a: 5,  cat: 'Moadim' },
+  { q: 'How many days of Pesach in Eretz Yisrael?',           a: 7,  cat: 'Moadim' },
+  { q: 'How many days of Sukkos in Eretz Yisrael?',           a: 7,  cat: 'Moadim' },
+  { q: 'How many days of Chanuka?',                           a: 8,  cat: 'Chanuka' },
+  { q: 'How many sons did Yaakov Avinu have?',                a: 12, cat: 'Shevatim' },
+  { q: 'How many sons did Noach have?',                       a: 3,  cat: 'Bereishis' },
+  { q: 'How many years was Yosef in prison?',                 a: 2,  cat: 'Bereishis' },
+  { q: 'How many Parshiyos are in the Torah?',                a: 54, cat: 'Torah' },
+  { q: 'How many books (seforim) are in the Torah?',          a: 5,  cat: 'Torah' },
+  { q: 'How many books are in Tanach altogether?',            a: 24, cat: 'Torah' },
+  { q: 'How many Mitzvos Aseh (positive commandments)?',      a: 248,cat: 'Mitzvos' },
+  { q: 'How many Mitzvos Lo Taaseh (negative commandments)?', a: 365,cat: 'Mitzvos' },
+  { q: 'Total number of Mitzvos in the Torah?',               a: 613,cat: 'Mitzvos' },
+  { q: 'How many days between Pesach and Shavuos (Sefira)?',  a: 49, cat: 'Moadim' },
+  { q: 'How many candles (total) on the last night of Chanuka?', a: 9, cat: 'Chanuka' },
+  { q: 'How many years did the Mishkan stand in Nov?',        a: 13, cat: 'History' },
+  { q: 'How many kings ruled a united Kingdom of Israel?',    a: 3,  cat: 'Melachim' },
+  { q: 'How many brothers sold Yosef?',                       a: 10, cat: 'Bereishis' },
+  { q: 'How many years was Shlomo HaMelech building the Beis HaMikdash?', a: 7, cat: 'Melachim' },
+  { q: 'How many stars appeared in Yosef\'s dream?',          a: 11, cat: 'Bereishis' },
+  { q: 'How many months of pregnancy before a birth?',        a: 9,  cat: 'Nature' },
+  { q: 'How many fingers on two hands?',                      a: 10, cat: 'Nature' },
+  { q: 'How many months in a Hebrew leap year?',              a: 13, cat: 'Calendar' },
+  { q: 'How many months in a regular Hebrew year?',           a: 12, cat: 'Calendar' },
+  { q: 'Days in a standard week?',                            a: 7,  cat: 'Calendar' },
+];
+
+const CHAZAL_QUOTES = [
+  "Kol haschalos kashos — all beginnings are difficult.",
+  "O chavrusa o misusa — fellowship or death.",
+  "Zrizim makdimim l'mitzvos — the zealous are early to mitzvos.",
+  "Michayil el chayil — from strength to strength.",
+  "Gadolah hachnasas orchim — great is hospitality.",
+  "Derech eretz kadma l'Torah.",
+  "Ein adam lomed Torah ela m'makom shelibo chafetz.",
+  "Talmud Torah k'neged kulam.",
+  "Lo hamidrash ikkar ela hamaaseh.",
+  "Olam chesed yibaneh — the world is built on kindness.",
+  "Al tiferosh min hatzibur — don't separate from the community.",
+  "V'hagisa bo yomam v'layla — meditate on it day and night."
+];
+
+const MADREIGA_LEVELS = [
+  { min: 0,   label: "Bein Hazmanim (Beginner)" },
+  { min: 100, label: "Ben Torah" },
+  { min: 250, label: "Masmid" },
+  { min: 450, label: "Lamdan" },
+  { min: 700, label: "Talmid Chacham" },
+  { min: 1000,label: "Gaon B'Torah" }
+];
+
+const rightComplements = [
+  "Pashut geonus! A gevaldige chiddush!",
+  "Mamash a baki b'Shas and b'SQL!",
+  "Kileilei! You nailed it.",
+  "Gevaldig! You're a true masmid.",
+  "Emes l'amito! The Mashgiach is schepping nachas.",
+  "A kup vi a beis medrash! Brilliant!",
+  "Yashrus! Clean, correct, kadosh."
+];
+const wrongInsults = [
+  "Oy vey, a shtickel krum.",
+  "Am ha'aretz! Check your syntax.",
+  "You're learning pshat like a baal habos!",
+  "Gevald, what kind of hava amina is this?",
+  "Nu nu, don't batel your time, fix the query!",
+  "That's farblunjet. Try again.",
+  "The Mashgiach is shaking his head. Almost!"
+];
+
+// ── Mashgiach deep hints (shown on 2nd wrong attempt) ─────────────
+const MASHGIACH_DEEP_HINTS = {
+  1: { text: `The Mashgiach whispers: <em>"Bochur, you need two things: the right <strong>columns</strong> and a <strong>WHERE clause</strong>."</em> Try: <code>SELECT name, activity FROM bochurim WHERE location = 'Smoking Area'</code>` },
+  2: { text: `The Mashgiach sighs: <em>"Two conditions, two words: <strong>AND</strong>."</em> The structure is <code>WHERE col1 = 'value1' AND col2 = 'value2'</code>. Check your quotes too!` },
+  3: { text: `<em>"Shmuli needs a <strong>metzuyan</strong> chavrusah in <strong>Kiddushin</strong>!"</em> You need <code>WHERE masechta = 'Kiddushin' AND strength = 'Metzuyan'</code> plus <code>ORDER BY blatt DESC</code> at the end.` },
+  4: { text: `The Mashgiach: <em>"Status is everything."</em> Write <code>WHERE status = 'Needs Chizzuk'</code> — exact spelling, capital N, capital C. Use <code>SELECT *</code> for all columns.` },
+  '5A': { text: `<em>"Miami... oy."</em> The Mashgiach shows you: <code>SELECT name FROM bein_hazmanim WHERE destination = 'Miami'</code> — only the name column, not SELECT *!` },
+  '5B': { text: `The Mashgiach: <em>"Nobody should eat tuna alone!"</em> <code>SELECT * FROM shabbos_meals WHERE host = 'None'</code> — 'None' with a capital N, in single quotes.` },
+  6: { text: `<em>"The cholent is cold AND missing!"</em> You need both conditions: <code>WHERE type = 'Meaty' AND temperature &lt; 150</code>. Select only <code>pot_id, location</code>.` },
+  7: { text: `The Mashgiach: <em>"Below 90 degrees is too cold for the mikvah!"</em> Write <code>SELECT pool_name FROM mikvah_pools WHERE temp_f &lt; 90</code>. Note: less-than, not less-than-or-equal!` },
+  8: { text: `<em>"The Rambam belongs on shelf 14 — but we want the ones that are NOT there!"</em> Use <code>shelf_num != 14</code> (or <code>&lt;&gt; 14</code>) with <code>AND author = 'Rambam'</code>.` },
+  9: { text: `The Mashgiach: <em>"Quantity zero means empty shelf!"</em> Simply: <code>SELECT item_name FROM pantry WHERE quantity = 0</code>. Numbers don't need quotes — <em>unlike cholent ingredients!</em>` },
+  10: { text: `<em>"Chosson side, Pending status — two filters."</em> <code>WHERE side = 'Chosson' AND RSVP_status = 'Pending'</code>. Select only <code>guest_name</code>.` },
+  11: { text: `The Mashgiach: <em>"After 6PM means at or after 1800!"</em> Use <code>WHERE flight_time >= 1800</code> with <code>ORDER BY flight_time ASC</code>. Use <code>SELECT *</code> for all info.` },
+  12: { text: `<em>"More than 500 AND Critical priority."</em> <code>WHERE amount_needed &gt; 500 AND priority_level = 'Critical'</code>. Select <code>family_name, amount_needed</code>.` },
+  13: { text: `The Mashgiach: <em>"Use the LIKE operator for partial matches!"</em> <code>WHERE item_desc LIKE '%Shas%'</code> — the percent signs are wildcards meaning 'anything before or after.'` },
+  14: { text: `<em>"First floor, extra pillows — easy!"</em> <code>WHERE floor = 1 AND has_extra_pillows = 'YES'</code>. Select only <code>room_num</code>. Remember 'YES' in quotes.` },
+  15: { text: `The Mashgiach smiles: <em>"Almost there, bochur! Last question!"</em> <code>WHERE is_occupied = 'NO' AND has_shtender = 'YES'</code>. Select <code>seat_id, row_name</code>.` }
+};
+
+// ── Boss Farher questions (triggered after chapters 5 & 10) ───────
+const FARHER_ROUNDS = {
+  after5: {
+    title: "🎓 Farher Before the Rosh Yeshiva — Mid-Zman",
+    subtitle: "The Rosh Yeshiva has heard of your SQL prowess. He wants to test you personally. Answer all queries in 90 seconds or repeat the zman!",
+    qs: [
+      {
+        schema: "TABLE shiurim (name TEXT, masechta TEXT, blatt INTEGER)",
+        task: "SELECT the <em>name</em> and <em>blatt</em> of all shiurim on masechta <em>'Bava Metzia'</em>.",
+        expectedResult: JSON.stringify([{name:"Morning Shiur",blatt:34},{name:"Night Seder",blatt:18}]),
+        hint: "You need SELECT name, blatt — then WHERE masechta = 'Bava Metzia'. Don't forget the table is called <code>shiurim</code>!"
+      },
+      {
+        schema: "TABLE donations (donor TEXT, amount INTEGER, year INTEGER)",
+        task: "SELECT <em>donor</em> where <em>amount</em> > 1000 and <em>year</em> = 2024.",
+        expectedResult: JSON.stringify([{donor:"Reb Feivel"},{donor:"Mr. Goldstein"}]),
+        hint: "Two conditions joined with AND: <code>WHERE amount > 1000 AND year = 2024</code>. Note: numbers don't need quotes!"
+      },
+      {
+        schema: "TABLE bochurim_farher (name TEXT, status TEXT)",
+        task: "SELECT <em>name</em> from bochurim_farher where <em>status</em> = <em>'Metzuyan'</em>.",
+        expectedResult: JSON.stringify([{name:"Yossi"},{name:"Chaim"}]),
+        hint: "<code>SELECT name FROM bochurim_farher WHERE status = 'Metzuyan'</code> — watch the capital M and exact spelling!"
+      }
+    ],
+    passReward: 150,
+    passText: "The Rosh Yeshiva nods approvingly. 'Yashar koach! You may continue to the second half of the zman. Extra kugel on Shabbos.' You earned 150 bonus XP!",
+    failText: "The Rosh Yeshiva sighs. 'A bochur must know his material. Review the first half, then we will try again.' You may continue — but the shame lingers..."
+  },
+  after10: {
+    title: "🎓 Final Farher — End of Zman",
+    subtitle: "The Rosh Yeshiva returns for the sof-zman farher. Answer all queries in 90 seconds. Prove yourself worthy of the Siyum!",
+    qs: [
+      {
+        schema: "TABLE chavrusas (name1 TEXT, name2 TEXT, masechta TEXT)",
+        task: "SELECT <em>name1</em>, <em>name2</em> where <em>masechta</em> = <em>'Kiddushin'</em>.",
+        expectedResult: JSON.stringify([{name1:"Shmuli",name2:"Yossi"},{name1:"Chaim",name2:"Dovid"}]),
+        hint: "<code>SELECT name1, name2 FROM chavrusas WHERE masechta = 'Kiddushin'</code> — select only the two name columns, not *!"
+      },
+      {
+        schema: "TABLE test_scores (bochur TEXT, test TEXT, score INTEGER)",
+        task: "SELECT <em>bochur</em> where <em>score</em> >= 90 ORDER BY <em>score</em> DESC.",
+        expectedResult: JSON.stringify([{bochur:"Shmaryahu"},{bochur:"Avrum"},{bochur:"Levi"}]),
+        hint: "<code>SELECT bochur FROM test_scores WHERE score >= 90 ORDER BY score DESC</code> — use >= (greater than or equal), and DESC for highest first."
+      },
+      {
+        schema: "TABLE shiur_schedule (day TEXT, time TEXT, rav TEXT)",
+        task: "SELECT <em>time</em>, <em>rav</em> where <em>day</em> = <em>'Monday'</em>.",
+        expectedResult: JSON.stringify([{time:"7:00 AM",rav:"Rav Schwartz"},{time:"9:30 PM",rav:"Rav Gold"}]),
+        hint: "<code>SELECT time, rav FROM shiur_schedule WHERE day = 'Monday'</code> — select only time and rav, not all columns."
+      }
+    ],
+    passReward: 250,
+    passText: "The Rosh Yeshiva stands up and shakes your hand! 'You have passed the farher with flying colors. The Siyum is well-deserved!' You earned 250 bonus XP!",
+    failText: "The Rosh Yeshiva pats your shoulder. 'You tried hard. The knowledge is there — just needs more chazara. The Siyum can still proceed.' You may continue!"
+  }
+};
+
+// Seed data for farher tables
+function seedFarherTables() {
+  try {
+    db.run(`CREATE TABLE IF NOT EXISTS shiurim (name TEXT, masechta TEXT, blatt INTEGER);`);
+    db.run(`INSERT OR IGNORE INTO shiurim VALUES ('Morning Shiur','Bava Metzia',34),('Night Seder','Bava Metzia',18),('Chavrusa Time','Kiddushin',5);`);
+    db.run(`CREATE TABLE IF NOT EXISTS donations (donor TEXT, amount INTEGER, year INTEGER);`);
+    db.run(`INSERT OR IGNORE INTO donations VALUES ('Reb Feivel',5000,2024),('Mr. Goldstein',1500,2024),('Anonymous',200,2024),('Rav Klein',800,2023);`);
+    // bochurim already exists, add metzuyan rows if needed
+    db.run(`CREATE TABLE IF NOT EXISTS chavrusas (name1 TEXT, name2 TEXT, masechta TEXT);`);
+    db.run(`INSERT OR IGNORE INTO chavrusas VALUES ('Shmuli','Yossi','Kiddushin'),('Chaim','Dovid','Kiddushin'),('Tzvi','Moishy','Bava Kamma');`);
+    db.run(`CREATE TABLE IF NOT EXISTS test_scores (bochur TEXT, test TEXT, score INTEGER);`);
+    db.run(`INSERT OR IGNORE INTO test_scores VALUES ('Shmaryahu','Bechinah 1',97),('Avrum','Bechinah 1',93),('Levi','Bechinah 1',90),('Yankel','Bechinah 1',72),('Berel','Bechinah 1',65);`);
+    db.run(`CREATE TABLE IF NOT EXISTS shiur_schedule (day TEXT, time TEXT, rav TEXT);`);
+    db.run(`INSERT OR IGNORE INTO shiur_schedule VALUES ('Monday','7:00 AM','Rav Schwartz'),('Monday','9:30 PM','Rav Gold'),('Tuesday','7:00 AM','Rav Schwartz'),('Friday','6:00 AM','Rav Gold');`);
+    // Separate table for the Metzuyan farher question (avoids name conflicts with main bochurim table)
+    db.run(`CREATE TABLE IF NOT EXISTS bochurim_farher (name TEXT, status TEXT);`);
+    db.run(`INSERT OR IGNORE INTO bochurim_farher VALUES ('Yossi','Metzuyan'),('Chaim','Metzuyan'),('Shmuli','SAKANA'),('Tzvi','WARNING');`);
+  } catch(e) { /* tables may already exist */ }
+}
+
+const chapters = {
+  1: {
+    title: "Perek Aleph: The Vaping Crisis",
+    schema: "TABLE bochurim (name TEXT, location TEXT, activity TEXT, status TEXT)",
+    narrative: "You walk onto the Ner Israel campus. The air is crisp, but right near the side doors, there's a thick cloud that smells suspiciously like blue raspberry. Rabbi Gold, the Mashgiach, taps your shoulder. '<em>Ein adam lomed Torah ela m'makom shelibo chafetz</em>, but their hearts are currently desiring the smoking area! I need you to pull up the records.'",
+    task: "Write a query to <strong>SELECT</strong> the <em>name</em> and <em>activity</em> of all bochurim where the <em>location</em> is <em>'Smoking Area'</em>.",
+    expectedResult: JSON.stringify([{name:"Shmuli",activity:"Vaping"},{name:"Tzvi",activity:"Schmoozing"}]),
+    hints: ["You need to filter the rows using the WHERE clause.","Your WHERE clause should look like: WHERE location = 'Smoking Area'","Make sure you only SELECT name, activity (not SELECT *)"],
+    echadQuestion: "Imahos (Mothers)",
+    echadAnswer: "4",
+    answerReveal: "SELECT name, activity\nFROM bochurim\nWHERE location = 'Smoking Area';",
+    next: 2
+  },
+  2: {
+    title: "Perek Beis: Missing First Seder",
+    schema: "TABLE seder_attendance (name TEXT, seder TEXT, attended TEXT)",
+    narrative: "You've cleared out the smoking area, and the bochurim are back inside. However, Rabbi Schwartz, the Shoel U'Maishiv, notices empty seats. '<em>Zrizim makdimim l'mitzvos!</em>' he exclaims. 'It's a sakana for their ruchniyus if they skip first seder. We need to track down who was missing this morning.'",
+    task: "List all columns (<strong>SELECT *</strong>) for records where the <em>seder</em> is <em>'First Seder'</em> AND <em>attended</em> is <em>'NO'</em>.",
+    expectedResult: JSON.stringify([{name:"Dovid",seder:"First Seder",attended:"NO"},{name:"Moishy",seder:"First Seder",attended:"NO"}]),
+    hints: ["Use SELECT * to get all columns.","You need two conditions. Use the AND operator.","WHERE seder = 'First Seder' AND attended = 'NO'"],
+    echadQuestion: "Sidrei Mishna",
+    echadAnswer: "6",
+    answerReveal: "SELECT *\nFROM seder_attendance\nWHERE seder = 'First Seder'\n  AND attended = 'NO';",
+    next: 3
+  },
+  3: {
+    title: "Perek Gimmel: O Chavrusa O Misusa",
+    schema: "TABLE learning_status (name TEXT, masechta TEXT, blatt INTEGER, strength TEXT)",
+    narrative: "Baruch Hashem, the bochurim are back! But Shmuli is struggling. Chazal tell us '<em>O chavrusa o misusa</em>'—give me fellowship or give me death! We need to pair Shmuli with a strong chavrusa learning the same Masechta. A good chavrusa can save a bochur from going off the derech entirely!",
+    task: "Find all bochurim learning <em>'Kiddushin'</em> whose <em>strength</em> is <em>'Metzuyan'</em>. Order them by <em>blatt</em> in descending order (highest first).",
+    expectedResult: JSON.stringify([{name:"Yossi",masechta:"Kiddushin",blatt:42,strength:"Metzuyan"},{name:"Chaim",masechta:"Kiddushin",blatt:12,strength:"Metzuyan"}]),
+    hints: ["Filter by masechta = 'Kiddushin' AND strength = 'Metzuyan'","To order the results, use ORDER BY blatt","Don't forget DESC at the end of ORDER BY to go highest-to-lowest."],
+    echadQuestion: "Shivtaya (Tribes)",
+    echadAnswer: "12",
+    answerReveal: "SELECT *\nFROM learning_status\nWHERE masechta = 'Kiddushin'\n  AND strength = 'Metzuyan'\nORDER BY blatt DESC;",
+    next: 4
+  },
+  4: {
+    title: "Perek Daled: The Crossroads of the Zman",
+    schema: "TABLE zman_status (name TEXT, status TEXT, comments TEXT)",
+    narrative: "The Zman is drawing to a close. '<em>Michayil el chayil</em>,' the Rosh Yeshiva says from the bimah. As Mashgiach, you must identify who is losing steam. Once you find them, you will face a crucial leader's choice: focus on Bein Hazmanim, or ensure proper Shabbos seudas?",
+    task: "Query the <em>zman_status</em> table — <strong>SELECT</strong> all columns where <em>status</em> is <em>'Needs Chizzuk'</em>. Your choice follows.",
+    expectedResult: JSON.stringify([{name:"Tzvi",status:"Needs Chizzuk",comments:"Falling asleep in night seder"},{name:"Moishy",status:"Needs Chizzuk",comments:"Looking at flights during shiur"}]),
+    hints: ["Select all columns using *.","Filter where status = 'Needs Chizzuk'.","No ordering is necessary."],
+    echadQuestion: "Luchos Habris",
+    echadAnswer: "2",
+    answerReveal: "SELECT *\nFROM zman_status\nWHERE status = 'Needs Chizzuk';",
+    isBranchingPoint: true
+  },
+  '5A': {
+    title: "Perek Hei: The Miami Sakana",
+    schema: "TABLE bein_hazmanim (name TEXT, destination TEXT, attending_yarchei_kallah TEXT)",
+    narrative: "You chose to focus on Bein Hazmanim! Excellent choice. Rabbi Levin approaches with a furrowed brow. 'A bochur without a misgeres during vacation is like a fish out of water. I heard some boys are flying to Miami instead of attending the local Yarchei Kallah — oy!'",
+    task: "Write a query to <strong>SELECT</strong> the <em>name</em> of bochurim where the <em>destination</em> is <em>'Miami'</em>.",
+    expectedResult: JSON.stringify([{name:"Moishy"},{name:"Shmuli"}]),
+    hints: ["Only SELECT the name column.","Filter by destination = 'Miami'.","Don't worry about the yarchei kallah column."],
+    echadQuestion: "Sifrei Torah b'Aron",
+    echadAnswer: "5",
+    answerReveal: "SELECT name\nFROM bein_hazmanim\nWHERE destination = 'Miami';",
+    next: 6
+  },
+  '5B': {
+    title: "Perek Hei: The Empty Plate",
+    schema: "TABLE shabbos_meals (name TEXT, meal TEXT, host TEXT)",
+    narrative: "You chose Shabbos arrangements! A true Ba'al Chesed. Mrs. Klein calls you: 'We have bochurim in town but some don't have a place for the Friday night seuda. <em>Gedolah hachnasas orchim</em>—we can't let them eat tuna in their dorms!'",
+    task: "Write a query to <strong>SELECT</strong> all columns from <em>shabbos_meals</em> where the <em>host</em> is <em>'None'</em>.",
+    expectedResult: JSON.stringify([{name:"Tzvi",meal:"Friday Night",host:"None"},{name:"Dovid",meal:"Shabbos Day",host:"None"}]),
+    hints: ["SELECT * to grab everything.","Filter by host = 'None'.","Make sure 'None' is in quotes."],
+    echadQuestion: "Yemei Milah",
+    echadAnswer: "8",
+    answerReveal: "SELECT *\nFROM shabbos_meals\nWHERE host = 'None';",
+    next: 6
+  },
+
+  // ── NEW PEREKS 6–15 ─────────────────────────────────────────────
+
+  6: {
+    title: "Perek 6: The Great Cholent Heist",
+    schema: "TABLE cholent_pots (pot_id INTEGER, type TEXT, location TEXT, temperature INTEGER)",
+    narrative: "It's Friday night, 2:00 AM. A rogue group of 'Frum-Teens' has allegedly moved the main Melee-type Cholent pot. Rabbi Hertzberg is frantic: '<em>Lo hamidrash ikkar ela hamaaseh!</em> We need action! The pot must be between 180 and 210 degrees to be edible by tomorrow.'",
+    task: "Find the <em>pot_id</em> and <em>location</em> of all pots where the <em>type</em> is <em>'Meaty'</em> and the <em>temperature</em> is less than <strong>150</strong>.",
+    expectedResult: JSON.stringify([{pot_id:102, location:"Back Alley"}]),
+    hints: ["Use WHERE type = 'Meaty' AND temperature < 150.","Select only pot_id and location.","Check the table name: cholent_pots."],
+    echadQuestion: "Kochvaya (Stars of Yosef's Dream)",
+    echadAnswer: "11",
+    answerReveal: "SELECT pot_id, location\nFROM cholent_pots\nWHERE type = 'Meaty'\n  AND temperature < 150;",
+    next: 7
+  },
+  7: {
+    title: "Perek 7: The Mikvah Temperature Crisis",
+    schema: "TABLE mikvah_pools (pool_name TEXT, water_level TEXT, temp_f INTEGER)",
+    narrative: "The Mikvah attendant, Reb Zalman, is in a panic. The boiler is acting up. Chazal say <em>'V'chol hamitaharim... b'mayim'</em>—but not in freezing water! We need to identify which pools are too cold for the morning immersion.",
+    task: "<strong>SELECT</strong> the <em>pool_name</em> of all pools where <em>temp_f</em> is below <strong>90</strong> degrees.",
+    expectedResult: JSON.stringify([{pool_name:"Bor 1"},{pool_name:"Techeiles Pool"}]),
+    hints: ["Filter using WHERE temp_f < 90.","Make sure you only return the pool_name.","Simple SELECT and WHERE clause."],
+    echadQuestion: "Yemei Shabata (Days of the week)",
+    echadAnswer: "7",
+    answerReveal: "SELECT pool_name\nFROM mikvah_pools\nWHERE temp_f < 90;",
+    next: 8
+  },
+  8: {
+    title: "Perek 8: Disorder in the Otzar",
+    schema: "TABLE seforim (title TEXT, author TEXT, category TEXT, shelf_num INTEGER)",
+    narrative: "A group of bochurim was learning 'lomdus' so hard they left the Rambams in the Hashkafa section. <em>'V'hagisa bo yomam v'layla'</em> doesn't mean leaving a mess! We need to find all Rambams that are NOT on Shelf 14.",
+    task: "<strong>SELECT *</strong> from <em>seforim</em> where the <em>author</em> is <em>'Rambam'</em> and <em>shelf_num</em> is NOT 14.",
+    expectedResult: JSON.stringify([{title:"Mishneh Torah Vol 1", author:"Rambam", category:"Halacha", shelf_num:4}]),
+    hints: ["Use the '!=' or '<>' operator for NOT equal.","WHERE author = 'Rambam' AND shelf_num != 14","Use SELECT * to get all columns."],
+    echadQuestion: "Middos Harachamim (Attributes of Mercy)",
+    echadAnswer: "13",
+    answerReveal: "SELECT *\nFROM seforim\nWHERE author = 'Rambam'\n  AND shelf_num != 14;",
+    next: 9
+  },
+  9: {
+    title: "Perek 9: The Coffee Room Drought",
+    schema: "TABLE pantry (item_name TEXT, quantity INTEGER, kosher_certification TEXT)",
+    narrative: "The 11:00 PM chavrusa break is approaching. If there is no sugar, the bitul Torah will be catastrophic. <em>'Ain Torah ela b'koach'</em>—and sometimes that strength comes from caffeine and sugar.",
+    task: "Find the <em>item_name</em> of all pantry items where the <em>quantity</em> is <strong>0</strong>.",
+    expectedResult: JSON.stringify([{item_name:"Sugar"},{item_name:"Whole Milk"}]),
+    hints: ["Filter for quantity = 0.","Select only the item_name.","Simple equality check — no quotes needed for a number."],
+    echadQuestion: "Yemei Bris Milah",
+    echadAnswer: "8",
+    answerReveal: "SELECT item_name\nFROM pantry\nWHERE quantity = 0;",
+    next: 10
+  },
+  10: {
+    title: "Perek 10: The Wedding Seating Shaila",
+    schema: "TABLE wedding_guests (guest_name TEXT, side TEXT, table_num INTEGER, RSVP_status TEXT)",
+    narrative: "The Rosh Yeshiva's son is getting married! We have a database of the guests. We need to find all guests on the 'Chosson' side who haven't RSVP'd yet so we can call them and save money on plates.",
+    task: "<strong>SELECT</strong> <em>guest_name</em> FROM <em>wedding_guests</em> WHERE <em>side</em> = <em>'Chosson'</em> AND <em>RSVP_status</em> = <em>'Pending'</em>.",
+    expectedResult: JSON.stringify([{guest_name:"Berel Klein"},{guest_name:"Yanky Miller"}]),
+    hints: ["Two conditions in the WHERE clause: side and RSVP_status.","Connect them with AND.","SELECT only the guest_name."],
+    echadQuestion: "Dibros (Commandments)",
+    echadAnswer: "10",
+    answerReveal: "SELECT guest_name\nFROM wedding_guests\nWHERE side = 'Chosson'\n  AND RSVP_status = 'Pending';",
+    next: 11
+  },
+  11: {
+    title: "Perek 11: The Airport Carpool",
+    schema: "TABLE flights (bochur_name TEXT, terminal TEXT, flight_time INTEGER)",
+    narrative: "Bein Hazmanim is here! Everyone is rushing to BWI airport. We need to group bochurim flying out after 6:00 PM (1800 hours) so they can share a van. <em>'Al tiferosh min hatzibur'</em>—don't pay for your own Uber!",
+    task: "<strong>SELECT *</strong> FROM <em>flights</em> WHERE <em>flight_time</em> >= <strong>1800</strong> ORDER BY <em>flight_time</em> <strong>ASC</strong>.",
+    expectedResult: JSON.stringify([{bochur_name:"Zalman", terminal:"A", flight_time:1830},{bochur_name:"Ari", terminal:"B", flight_time:1900},{bochur_name:"Tzvi", terminal:"D", flight_time:2100}]),
+    hints: ["Use >= for 1800.","Use ORDER BY flight_time ASC to keep it chronological.","SELECT * to get all columns."],
+    echadQuestion: "Yarheya (Months of the year)",
+    echadAnswer: "12",
+    answerReveal: "SELECT *\nFROM flights\nWHERE flight_time >= 1800\nORDER BY flight_time ASC;",
+    next: 12
+  },
+  12: {
+    title: "Perek 12: Matanot L'Evyonim Logistics",
+    schema: "TABLE tzedakah_requests (family_name TEXT, amount_needed INTEGER, priority_level TEXT)",
+    narrative: "Purim is coming. The Gabbi Tzedakah needs to distribute funds. <em>'Olam chesed yibaneh'</em>. We need to find families who need more than $500 and are marked as 'Critical'.",
+    task: "<strong>SELECT</strong> <em>family_name</em> and <em>amount_needed</em> WHERE <em>amount_needed</em> > <strong>500</strong> AND <em>priority_level</em> = <em>'Critical'</em>.",
+    expectedResult: JSON.stringify([{family_name:"Cohen", amount_needed:1200}]),
+    hints: ["Filter with > 500.","Filter for 'Critical' — capitals matter!","SELECT two specific columns."],
+    echadQuestion: "Imahos (Mothers)",
+    echadAnswer: "4",
+    answerReveal: "SELECT family_name, amount_needed\nFROM tzedakah_requests\nWHERE amount_needed > 500\n  AND priority_level = 'Critical';",
+    next: 13
+  },
+  13: {
+    title: "Perek 13: The Lost Vilna Shas",
+    schema: "TABLE lost_and_found (item_desc TEXT, location_found TEXT, date_found TEXT)",
+    narrative: "A bochur lost his grandfather's Vilna Shas! It's a huge <em>Hashavas Aveida</em> mitzvah. He thinks he left it in the Dining Hall last Tuesday.",
+    task: "Find all records where <em>item_desc</em> <strong>contains</strong> the word <em>'Shas'</em> and <em>location_found</em> is <em>'Dining Hall'</em>.",
+    expectedResult: JSON.stringify([{item_desc:"Leather bound Shas", location_found:"Dining Hall", date_found:"2023-10-12"}]),
+    hints: ["Use the LIKE operator for 'contains'.","WHERE item_desc LIKE '%Shas%'","AND location_found = 'Dining Hall'"],
+    echadQuestion: "Avos (Patriarchs)",
+    echadAnswer: "3",
+    answerReveal: "SELECT *\nFROM lost_and_found\nWHERE item_desc LIKE '%Shas%'\n  AND location_found = 'Dining Hall';",
+    next: 14
+  },
+  14: {
+    title: "Perek 14: The Guest House Pillows",
+    schema: "TABLE guest_rooms (room_num INTEGER, floor INTEGER, has_extra_pillows TEXT)",
+    narrative: "A visiting Maggid Shiur is staying overnight. He is an older man and needs extra pillows for his back. <em>'V'hadarta pnei zaken'</em>—honor the elderly! Find him a room on the 1st floor with extra pillows.",
+    task: "<strong>SELECT</strong> <em>room_num</em> FROM <em>guest_rooms</em> WHERE <em>floor</em> = <strong>1</strong> AND <em>has_extra_pillows</em> = <em>'YES'</em>.",
+    expectedResult: JSON.stringify([{room_num:105}]),
+    hints: ["Filter by floor = 1.","Filter by has_extra_pillows = 'YES'.","Only return the room_num."],
+    echadQuestion: "Sidrei Mishna",
+    echadAnswer: "6",
+    answerReveal: "SELECT room_num\nFROM guest_rooms\nWHERE floor = 1\n  AND has_extra_pillows = 'YES';",
+    next: 15
+  },
+  15: {
+    title: "Perek 15: The New Zman Seat Swap",
+    schema: "TABLE bm_seats (seat_id TEXT, row_name TEXT, is_occupied TEXT, has_shtender TEXT)",
+    narrative: "It's the first day of Elul Zman. The scramble for seats is like the splitting of the Yam Suf! We need to find an empty seat (is_occupied = 'NO') that already has a built-in shtender. This is the final test of your SQL shteiging!",
+    task: "<strong>SELECT</strong> <em>seat_id</em> and <em>row_name</em> FROM <em>bm_seats</em> WHERE <em>is_occupied</em> = <em>'NO'</em> AND <em>has_shtender</em> = <em>'YES'</em>.",
+    expectedResult: JSON.stringify([{seat_id:"M14", row_name:"Mizrach"}]),
+    hints: ["Check for 'NO' and 'YES' strings — exact match.","SELECT two specific columns.","This is the final perek — you've got this!"],
+    echadQuestion: "Shivtaya (Tribes)",
+    echadAnswer: "12",
+    answerReveal: "SELECT seat_id, row_name\nFROM bm_seats\nWHERE is_occupied = 'NO'\n  AND has_shtender = 'YES';",
+    next: 'END'
+  }
+};
+
+const PEREK_KEYS = [1,2,3,4,'5A','5B',6,7,8,9,10,11,12,13,14,15];
+
+// ===================================================================
+// SQL INIT
+// ===================================================================
+async function initDB() {
+  const SQL = await initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/${f}` });
+  db = new SQL.Database();
+
+  // ── Pereks 1–5 ──────────────────────────────────────────────────
+  db.run(`CREATE TABLE bochurim (name TEXT, location TEXT, activity TEXT, status TEXT);`);
+  db.run(`INSERT INTO bochurim VALUES ('Shmuli','Smoking Area','Vaping','SAKANA'),('Yossi','Beis Medrash','Shteiging','GEVALDIG'),('Tzvi','Smoking Area','Schmoozing','WARNING'),('Chaim','Coffee Room','Making Tea','NOMINAL');`);
+
+  db.run(`CREATE TABLE seder_attendance (name TEXT, seder TEXT, attended TEXT);`);
+  db.run(`INSERT INTO seder_attendance VALUES ('Dovid','First Seder','NO'),('Yossi','First Seder','YES'),('Moishy','First Seder','NO'),('Shmuli','Second Seder','YES');`);
+
+  db.run(`CREATE TABLE learning_status (name TEXT, masechta TEXT, blatt INTEGER, strength TEXT);`);
+  db.run(`INSERT INTO learning_status VALUES ('Yossi','Kiddushin',42,'Metzuyan'),('Dovid','Bava Kamma',15,'Metzuyan'),('Chaim','Kiddushin',12,'Metzuyan'),('Moishy','Kiddushin',8,'Weak');`);
+
+  db.run(`CREATE TABLE zman_status (name TEXT, status TEXT, comments TEXT);`);
+  db.run(`INSERT INTO zman_status VALUES ('Tzvi','Needs Chizzuk','Falling asleep in night seder'),('Yossi','Shteiging','Finished Masechta'),('Moishy','Needs Chizzuk','Looking at flights during shiur');`);
+
+  db.run(`CREATE TABLE bein_hazmanim (name TEXT, destination TEXT, attending_yarchei_kallah TEXT);`);
+  db.run(`INSERT INTO bein_hazmanim VALUES ('Moishy','Miami','NO'),('Yossi','Home','YES'),('Shmuli','Miami','NO');`);
+
+  db.run(`CREATE TABLE shabbos_meals (name TEXT, meal TEXT, host TEXT);`);
+  db.run(`INSERT INTO shabbos_meals VALUES ('Tzvi','Friday Night','None'),('Yossi','Friday Night','Rabbi Gold'),('Dovid','Shabbos Day','None');`);
+
+  // ── Perek 6: Cholent Pots ────────────────────────────────────────
+  db.run(`CREATE TABLE cholent_pots (pot_id INTEGER, type TEXT, location TEXT, temperature INTEGER);`);
+  db.run(`INSERT INTO cholent_pots VALUES
+    (101, 'Meaty',  'Kitchen',    195),
+    (102, 'Meaty',  'Back Alley', 85),
+    (103, 'Pareve', 'Dining Hall',200),
+    (104, 'Milky',  'Kitchen',    170);`);
+
+  // ── Perek 7: Mikvah Pools ────────────────────────────────────────
+  db.run(`CREATE TABLE mikvah_pools (pool_name TEXT, water_level TEXT, temp_f INTEGER);`);
+  db.run(`INSERT INTO mikvah_pools VALUES
+    ('Bor 1',         'Full',  72),
+    ('Main Pool',     'Full',  98),
+    ('Techeiles Pool','Half',  65),
+    ('Warm Spring',   'Full', 104);`);
+
+  // ── Perek 8: Seforim ─────────────────────────────────────────────
+  db.run(`CREATE TABLE seforim (title TEXT, author TEXT, category TEXT, shelf_num INTEGER);`);
+  db.run(`INSERT INTO seforim VALUES
+    ('Mishneh Torah Vol 1', 'Rambam',   'Halacha',   4),
+    ('Mishneh Torah Vol 2', 'Rambam',   'Halacha',  14),
+    ('Moreh Nevuchim',      'Rambam',   'Machshava', 14),
+    ('Nefesh Hachaim',      'Rav Chaim','Machshava', 10),
+    ('Shulchan Aruch',      'Maran',    'Halacha',   2);`);
+
+  // ── Perek 9: Pantry ──────────────────────────────────────────────
+  db.run(`CREATE TABLE pantry (item_name TEXT, quantity INTEGER, kosher_certification TEXT);`);
+  db.run(`INSERT INTO pantry VALUES
+    ('Coffee',     24, 'OU'),
+    ('Sugar',       0, 'OU'),
+    ('Tea Bags',   15, 'Star-K'),
+    ('Whole Milk',  0, 'Chalav Yisrael'),
+    ('Creamer',     8, 'OU');`);
+
+  // ── Perek 10: Wedding Guests ──────────────────────────────────────
+  db.run(`CREATE TABLE wedding_guests (guest_name TEXT, side TEXT, table_num INTEGER, RSVP_status TEXT);`);
+  db.run(`INSERT INTO wedding_guests VALUES
+    ('Berel Klein',  'Chosson', 5,  'Pending'),
+    ('Yanky Miller', 'Chosson', 7,  'Pending'),
+    ('Devorah Weiss','Kallah',  3,  'Pending'),
+    ('Shmuel Gold',  'Chosson', 2,  'Confirmed'),
+    ('Leah Horowitz','Kallah',  4,  'Confirmed');`);
+
+  // ── Perek 11: Flights ────────────────────────────────────────────
+  db.run(`CREATE TABLE flights (bochur_name TEXT, terminal TEXT, flight_time INTEGER);`);
+  db.run(`INSERT INTO flights VALUES
+    ('Moishy',  'C', 1100),
+    ('Dovid',   'A', 1430),
+    ('Zalman',  'A', 1830),
+    ('Ari',     'B', 1900),
+    ('Tzvi',    'D', 2100);`);
+
+  // ── Perek 12: Tzedakah Requests ───────────────────────────────────
+  db.run(`CREATE TABLE tzedakah_requests (family_name TEXT, amount_needed INTEGER, priority_level TEXT);`);
+  db.run(`INSERT INTO tzedakah_requests VALUES
+    ('Cohen',    1200, 'Critical'),
+    ('Levy',      300, 'Moderate'),
+    ('Friedman',  750, 'High'),
+    ('Klein',     180, 'Low'),
+    ('Stern',      50, 'Critical');`);
+
+  // ── Perek 13: Lost and Found ──────────────────────────────────────
+  db.run(`CREATE TABLE lost_and_found (item_desc TEXT, location_found TEXT, date_found TEXT);`);
+  db.run(`INSERT INTO lost_and_found VALUES
+    ('Leather bound Shas',  'Dining Hall', '2023-10-12'),
+    ('Black hat',           'Beis Medrash','2023-10-14'),
+    ('Pocket Shas',         'Dormitory',   '2023-10-10'),
+    ('Tallis bag',          'Shul',        '2023-10-13'),
+    ('Mishnayos Shas',      'Library',     '2023-10-09');`);
+
+  // ── Perek 14: Guest Rooms ─────────────────────────────────────────
+  db.run(`CREATE TABLE guest_rooms (room_num INTEGER, floor INTEGER, has_extra_pillows TEXT);`);
+  db.run(`INSERT INTO guest_rooms VALUES
+    (101, 1, 'NO'),
+    (102, 2, 'YES'),
+    (103, 1, 'NO'),
+    (104, 3, 'YES'),
+    (105, 1, 'YES'),
+    (106, 2, 'NO');`);
+
+  // ── Perek 15: Beis Medrash Seats ──────────────────────────────────
+  db.run(`CREATE TABLE bm_seats (seat_id TEXT, row_name TEXT, is_occupied TEXT, has_shtender TEXT);`);
+  db.run(`INSERT INTO bm_seats VALUES
+    ('A1',  'Aleph',  'YES', 'NO'),
+    ('B3',  'Beis',   'YES', 'YES'),
+    ('M14', 'Mizrach','NO',  'YES'),
+    ('D7',  'Daled',  'NO',  'NO'),
+    ('E2',  'Hei',    'YES', 'YES'),
+    ('F9',  'Vav',    'NO',  'NO');`);
+
+  seedFarherTables();
+}
+
+// ===================================================================
+// SCREEN MANAGEMENT
+// ===================================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function pickAvatar(el) {
+  document.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  avatar = el.dataset.emoji;
+  // Multimedia: apply SVG glasses for Rav
+  if (typeof applyAvatarStyle === 'function') applyAvatarStyle(avatar);
+}
+
+function showBackstory() {
+  captainName = document.getElementById('name-input').value.trim() || "Reb Chaim";
+  document.getElementById('avatar-name').textContent = captainName;
+  const emojiEl = document.getElementById('avatar-emoji');
+  if (emojiEl) emojiEl.textContent = avatar;
+  document.getElementById('header-status').textContent = `${captainName} • Perek 1`;
+  document.getElementById('header-status').classList.add('visible');
+  if (typeof applyAvatarStyle === 'function') applyAvatarStyle(avatar);
+  showScreen('screen-backstory');
+}
+
+function startGame() {
+  buildPerekDots();
+  renderOtzar();
+  showScreen('screen-game');
+  loadChapter(1);
+  // Multimedia: init avatar expression and BM state
+  if (typeof setAvatarExpression === 'function') setAvatarExpression('neutral');
+  if (typeof updateBeisMediashWindows === 'function') updateBeisMediashWindows();
+}
+
+// ===================================================================
+// PEREK DOTS
+// ===================================================================
+function buildPerekDots() {
+  const container = document.getElementById('perek-dots');
+  container.innerHTML = '';
+  const dotKeys = [1,2,3,4,'5A',6,7,8,9,10,11,12,13,14,15];
+  const labels = {1:'א',2:'ב',3:'ג',4:'ד','5A':'ה',6:'ו',7:'ז',8:'ח',9:'ט',10:'י',11:'יא',12:'יב',13:'יג',14:'יד',15:'טו'};
+  dotKeys.forEach(k => {
+    const d = document.createElement('div');
+    d.className = 'zman-dot';
+    d.id = 'dot-' + k;
+    d.textContent = labels[k];
+    d.title = chapters[k]?.title || '';
+    container.appendChild(d);
+  });
+}
+
+function updateDots(ch) {
+  const dotCh = ch === '5B' ? '5A' : ch;
+  const dotKeys = [1,2,3,4,'5A',6,7,8,9,10,11,12,13,14,15];
+  dotKeys.forEach(k => {
+    const d = document.getElementById('dot-' + k);
+    if (!d) return;
+    d.classList.remove('completed','current');
+    const normalized = chaptersCompleted.map(c => c === '5B' ? '5A' : c);
+    if (normalized.includes(k)) d.classList.add('completed');
+    else if (k == dotCh || k === dotCh) d.classList.add('current');
+  });
+}
+
+// ===================================================================
+// XP & MADREIGA
+// ===================================================================
+function addXP(amount) {
+  xp += amount;
+  document.getElementById('xp-value').textContent = `${xp} XP`;
+  const maxXP = 1200;
+  const pct = Math.min(100, Math.round(xp / maxXP * 100));
+  document.getElementById('xp-bar').style.width = pct + '%';
+
+  let level = MADREIGA_LEVELS[0].label;
+  for (const l of MADREIGA_LEVELS) {
+    if (xp >= l.min) level = l.label;
+  }
+  document.getElementById('madreiga-label').textContent = level;
+  document.getElementById('avatar-title').textContent = level;
+  // Multimedia: update Beis Medrash windows to reflect new XP
+  if (typeof updateBeisMediashWindows === 'function') updateBeisMediashWindows();
+}
+
+function rotateChazal() {
+  const q = CHAZAL_QUOTES[Math.floor(Math.random() * CHAZAL_QUOTES.length)];
+  document.getElementById('chazal-quote').textContent = q;
+}
+
+// ===================================================================
+// LOAD CHAPTER
+// ===================================================================
+function loadChapter(ch) {
+  currentChapter = ch;
+  hintIndex = 0;
+  wrongAttempts = 0;
+
+  const chap = chapters[ch];
+  document.getElementById('task-title-display').textContent = chap.title;
+  document.getElementById('schema-display').innerHTML = `<strong style="color:var(--gold-dim)">Schema:</strong> ${chap.schema}`;
+  document.getElementById('task-desc-display').innerHTML = chap.task;
+
+  // Dynamic Echad Mi Yodea trivia
+  pickNewTrivia();
+
+  document.getElementById('echad-input').value = '';
+  document.getElementById('query-input').value = '';
+  document.getElementById('query-input').style.pointerEvents = '';
+  document.getElementById('query-input').style.opacity = '';
+  document.getElementById('highlight-overlay').innerHTML = '';
+  updateLineNumbers('');
+
+  document.getElementById('result-area').style.display = 'none';
+  document.getElementById('next-btn').classList.remove('visible');
+  document.getElementById('branch-row').classList.remove('visible');
+
+  document.getElementById('header-status').textContent = `${avatar} ${captainName} • ${chap.title}`;
+  updateDots(ch);
+  rotateChazal();
+  closeMashgiach();
+
+  typeWriter(chap.narrative, document.getElementById('narrative-box'));
+}
+
+// ===================================================================
+// CHAPTER TRANSITION ANIMATION
+// ===================================================================
+function doChapterTransition(label, cb) {
+  const overlay = document.getElementById('chapter-overlay');
+  const flashLabel = document.getElementById('chapter-flash-label');
+  flashLabel.textContent = label;
+  overlay.classList.add('active');
+  setTimeout(() => {
+    cb();
+    setTimeout(() => overlay.classList.remove('active'), 600);
+  }, 700);
+}
+
+function nextChapter() {
+  // Check if farher should fire before loading next chapter
+  const farhers = { 6: 'after5', 11: 'after10' };
+  if (farhers[nextPerekDest] && !chaptersCompleted.includes('farher_' + farhers[nextPerekDest])) {
+    triggerFarher(farhers[nextPerekDest], nextPerekDest);
+    return;
+  }
+  if (nextPerekDest === 'END') {
+    doChapterTransition('סיום מסכת!', showSiyum);
+  } else {
+    doChapterTransition(chapters[nextPerekDest]?.title || 'Next Perek', () => loadChapter(nextPerekDest));
+  }
+}
+
+function goToBranch(path) {
+  const key = path === 'A' ? '5A' : '5B';
+  doChapterTransition(chapters[key].title, () => loadChapter(key));
+}
+
+function showSiyum() {
+  showScreen('screen-siyum');
+  launchConfetti();
+  // Multimedia: fanfare + happy avatar + full BM glow
+  if (typeof playSiyumFanfare === 'function') playSiyumFanfare();
+  if (typeof setAvatarExpression === 'function') setAvatarExpression('happy');
+  if (typeof beisMediashFlash === 'function') beisMediashFlash();
+}
+
+// ===================================================================
+// ROBUST SQL RESULT COMPARISON
+// Compares two result arrays (objects) ignoring row order and column order.
+// Each row is normalized to a sorted-key JSON string for comparison.
+// ===================================================================
+function normRow(row) {
+  // Sort keys alphabetically so column order doesn't matter
+  const sorted = {};
+  Object.keys(row).sort().forEach(k => {
+    // Normalize: coerce numbers stored as strings, trim whitespace on strings
+    const v = row[k];
+    sorted[k] = (typeof v === 'string') ? v.trim() : v;
+  });
+  return JSON.stringify(sorted);
+}
+
+function compareSqlResults(userRows, expectedRows) {
+  if (!Array.isArray(userRows) || !Array.isArray(expectedRows)) return false;
+  if (userRows.length !== expectedRows.length) return false;
+
+  // Sort both arrays by their normalized row string so row order doesn't matter
+  const userSorted = userRows.map(normRow).sort();
+  const expSorted  = expectedRows.map(normRow).sort();
+
+  return userSorted.every((r, i) => r === expSorted[i]);
+}
+
+// ===================================================================
+// QUERY RUNNER
+// ===================================================================
+function runQuery() {
+  if (typeof setAvatarExpression === 'function') setAvatarExpression('thinking');
+  const query = document.getElementById('query-input').value.trim();
+  if (!query || !db) { showToast('error', "Write a query first, don't be a batlan!"); return; }
+
+  const resultArea = document.getElementById('result-area');
+  const resultInner = document.getElementById('result-inner');
+  resultArea.style.display = 'block';
+
+  try {
+    const stmt = db.exec(query);
+    if (stmt.length === 0 || stmt[0].values.length === 0) {
+      wrongAttempts++;
+      resultInner.innerHTML = `<div class="feedback-wrong">❌ ${getRandom(wrongInsults)} <br><span style="color:var(--ink-faint);font-size:0.85em">Query ran but returned zero rows.</span></div>`;
+      maybeShowMashgiach();
+      // Multimedia: sigh + sad avatar
+      if (typeof playSigh === 'function') playSigh();
+      if (typeof setAvatarExpression === 'function') { setAvatarExpression('sad'); setTimeout(()=>setAvatarExpression('thinking'), 3500); }
+      if (typeof beisMediashDim === 'function') beisMediashDim();
+      return;
+    }
+    const columns = stmt[0].columns;
+    let html = `<table class="result-table"><tr>${columns.map(c=>`<th>${c}</th>`).join('')}</tr>`;
+    stmt[0].values.forEach(row => { html += `<tr>${row.map(c=>`<td>${c}</td>`).join('')}</tr>`; });
+    html += `</table>`;
+
+    const userRows = stmt[0].values.map((row) => {
+      const obj = {}; columns.forEach((c,i) => obj[c] = row[i]); return obj;
+    });
+    // Parse expected result and use robust comparison
+    const chap = chapters[currentChapter];
+    const expectedRows = JSON.parse(chap.expectedResult);
+    if (compareSqlResults(userRows, expectedRows)) {
+      resultInner.innerHTML = `<div class="feedback-correct">✅ ${getRandom(rightComplements)}</div>${html}`;
+      chaptersCompleted.push(currentChapter);
+      wrongAttempts = 0;
+      closeMashgiach();
+      addXP(75);
+      updateDots(currentChapter);
+      launchConfetti();
+      checkAndAwardSefer(currentChapter);
+      // Multimedia: success sounds + expressions
+      if (typeof playClink === 'function') playClink();
+      if (typeof setAvatarExpression === 'function') { setAvatarExpression('happy'); setTimeout(()=>setAvatarExpression('neutral'), 4000); }
+      if (typeof beisMediashFlash === 'function') beisMediashFlash();
+
+      // Disable input
+      document.getElementById('query-input').style.pointerEvents = 'none';
+      document.getElementById('query-input').style.opacity = '0.4';
+
+      if (chap.isBranchingPoint) {
+        document.getElementById('branch-row').classList.add('visible');
+        document.querySelectorAll('.btn-branch').forEach(b => b.classList.add('visible'));
+      } else {
+        nextPerekDest = chap.next;
+        const btn = document.getElementById('next-btn');
+        btn.classList.add('visible');
+        btn.textContent = nextPerekDest === 'END' ? 'Make the Siyum! 🎉' : `Proceed to Next Perek ➡`;
+      }
+    } else {
+      wrongAttempts++;
+      resultInner.innerHTML = `<div class="feedback-wrong">❌ ${getRandom(wrongInsults)} Result doesn't match what the Mashgiach asked for.</div>${html}`;
+      maybeShowMashgiach();
+      // Multimedia: sigh + sad avatar + dim windows
+      if (typeof playSigh === 'function') playSigh();
+      if (typeof setAvatarExpression === 'function') { setAvatarExpression('sad'); setTimeout(()=>setAvatarExpression('thinking'), 3500); }
+      if (typeof beisMediashDim === 'function') beisMediashDim();
+    }
+  } catch(e) {
+    wrongAttempts++;
+    resultInner.innerHTML = `<div class="feedback-wrong" style="font-family:'Courier Prime',monospace;font-size:0.85em">SQL Error: ${e.message}</div>`;
+    maybeShowMashgiach();
+    // Multimedia: sigh + sad avatar
+    if (typeof playSigh === 'function') playSigh();
+    if (typeof setAvatarExpression === 'function') { setAvatarExpression('sad'); setTimeout(()=>setAvatarExpression('thinking'), 3500); }
+    if (typeof beisMediashDim === 'function') beisMediashDim();
+  }
+}
+
+// ===================================================================
+// HINT SYSTEM
+// ===================================================================
+function showHint() {
+  const chap = chapters[currentChapter];
+  document.getElementById('hint-num').textContent = hintIndex + 1;
+  document.getElementById('hint-body').textContent = chap.hints[hintIndex];
+  document.getElementById('hint-toast').classList.add('visible');
+  if (hintIndex < 2) hintIndex++;
+}
+function closeHintToast() {
+  document.getElementById('hint-toast').classList.remove('visible');
+}
+
+// ===================================================================
+// DYNAMIC ECHAD MI YODEA TRIVIA
+// ===================================================================
+function pickNewTrivia() {
+  currentTrivia = getRandom(TORAH_TRIVIA_POOL);
+  document.getElementById('echad-question').textContent = currentTrivia.q;
+  document.getElementById('echad-category').textContent = currentTrivia.cat;
+}
+
+function revealAnswer() {
+  const chap = chapters[currentChapter];
+  const guess = parseInt(document.getElementById('echad-input').value.trim(), 10);
+  if (!currentTrivia) return;
+
+  if (guess === currentTrivia.a) {
+    document.getElementById('query-input').value = chap.answerReveal;
+    syncHighlight();
+    updateLineNumbers(chap.answerReveal);
+    showToast('success', 'Yashar Koach! The answer has been revealed. (' + currentTrivia.a + ' was correct!)');
+    // Pick a fresh trivia question so it can't be reused immediately
+    pickNewTrivia();
+    document.getElementById('echad-input').value = '';
+  } else if (isNaN(guess)) {
+    showToast('error', 'Enter a number! This is Echad Mi Yodea, not an essay question.');
+  } else {
+    showToast('error', `Nu nu... ${guess} is not the right answer. Hint: it's between 1 and 613!`);
+    // Rotate to a fresh question after wrong attempt so player can try again
+    pickNewTrivia();
+    document.getElementById('echad-input').value = '';
+  }
+}
+
+function showToast(type, msg) {
+  document.getElementById('hint-num').textContent = type === 'success' ? '✓' : '✗';
+  document.getElementById('hint-body').textContent = msg;
+  const toast = document.getElementById('hint-toast');
+  toast.style.borderColor = type === 'success' ? 'var(--correct)' : 'var(--wrong)';
+  toast.classList.add('visible');
+  setTimeout(() => { toast.classList.remove('visible'); toast.style.borderColor = ''; }, 3800);
+}
+
+// ===================================================================
+// TYPEWRITER EFFECT
+// ===================================================================
+function typeWriter(html, el, speed = 15) {
+  if (typeWriterTimer) clearInterval(typeWriterTimer);
+  el.innerHTML = '';
+  // Parse HTML to handle tags correctly
+  const template = document.createElement('div');
+  template.innerHTML = html;
+  const textNodes = [];
+  function collectText(node) {
+    if (node.nodeType === 3) textNodes.push({ type:'text', content: node.textContent });
+    else if (node.nodeType === 1) {
+      textNodes.push({ type:'open', tag: node.outerHTML.split(node.innerHTML)[0] });
+      node.childNodes.forEach(collectText);
+      textNodes.push({ type:'close', tag: `</${node.tagName.toLowerCase()}>` });
+    }
+  }
+  template.childNodes.forEach(collectText);
+
+  let buf = '', i = 0, charQueue = '';
+
+  // Flatten to character stream with embedded HTML
+  const stream = [];
+  textNodes.forEach(t => {
+    if (t.type === 'text') { for(const c of t.content) stream.push({char:c}); }
+    else stream.push({tag: (t.type==='open'?t.tag:t.tag)});
+  });
+
+  let cursor = document.createElement('span');
+  cursor.className = 'narrative-cursor';
+  el.appendChild(cursor);
+
+  let idx = 0;
+  typeWriterTimer = setInterval(() => {
+    if (idx >= stream.length) {
+      clearInterval(typeWriterTimer);
+      cursor.remove();
+      return;
+    }
+    const item = stream[idx];
+    if (item.tag !== undefined) {
+      // Insert raw HTML tag before cursor
+      cursor.insertAdjacentHTML('beforebegin', item.tag);
+    } else {
+      cursor.insertAdjacentText('beforebegin', item.char);
+    }
+    idx++;
+  }, speed);
+}
+
+// ===================================================================
+// SQL SYNTAX HIGHLIGHTER
+// ===================================================================
+const SQL_KEYWORDS = /\b(SELECT|FROM|WHERE|AND|OR|NOT|ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT|OFFSET|INSERT|INTO|VALUES|UPDATE|SET|DELETE|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AS|DISTINCT|COUNT|SUM|AVG|MIN|MAX|IN|LIKE|BETWEEN|IS|NULL|CREATE|TABLE|DROP|ALTER|INDEX|UNIQUE|PRIMARY|KEY|DESC|ASC|ALL|UNION|EXISTS)\b/gi;
+const SQL_STRINGS = /'[^']*'/g;
+const SQL_NUMBERS = /\b\d+(\.\d+)?\b/g;
+const SQL_COMMENTS = /--[^\n]*/g;
+const SQL_FUNCTIONS = /\b(COUNT|SUM|AVG|MIN|MAX|COALESCE|IFNULL|TRIM|UPPER|LOWER|LENGTH|SUBSTR|REPLACE|STRFTIME|DATE|DATETIME|NOW)\b(?=\s*\()/gi;
+
+function highlightSQL(code) {
+  // Escape HTML
+  let h = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Order matters: comments first (greedy), then strings (protect from keyword matching)
+  // We do a simple pass with placeholder approach
+  const strings = [];
+  const comments = [];
+
+  h = h.replace(SQL_COMMENTS, m => { comments.push(m); return `\x00C${comments.length-1}\x00`; });
+  h = h.replace(SQL_STRINGS, m => { strings.push(m); return `\x00S${strings.length-1}\x00`; });
+  h = h.replace(SQL_FUNCTIONS, m => `<span class="sql-function">${m}</span>`);
+  h = h.replace(SQL_KEYWORDS, m => `<span class="sql-keyword">${m}</span>`);
+  h = h.replace(SQL_NUMBERS, m => `<span class="sql-number">${m}</span>`);
+  // Restore
+  h = h.replace(/\x00S(\d+)\x00/g, (_,i) => `<span class="sql-string">${strings[i]}</span>`);
+  h = h.replace(/\x00C(\d+)\x00/g, (_,i) => `<span class="sql-comment">${comments[i]}</span>`);
+  return h;
+}
+
+function syncHighlight() {
+  const val = document.getElementById('query-input').value;
+  document.getElementById('highlight-overlay').innerHTML = highlightSQL(val) + ' ';
+}
+
+function updateLineNumbers(val) {
+  const lines = val.split('\n').length || 1;
+  let nums = '';
+  for(let i=1; i<=Math.max(lines,1); i++) nums += i + '\n';
+  document.getElementById('line-numbers').textContent = nums.trimEnd();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const ta = document.getElementById('query-input');
+  ta.addEventListener('input', () => {
+    syncHighlight();
+    updateLineNumbers(ta.value);
+  });
+  ta.addEventListener('scroll', () => {
+    document.getElementById('highlight-overlay').scrollTop = ta.scrollTop;
+    document.getElementById('highlight-overlay').scrollLeft = ta.scrollLeft;
+    document.getElementById('line-numbers').scrollTop = ta.scrollTop;
+  });
+  // Tab key support
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const s = ta.selectionStart, end = ta.selectionEnd;
+      ta.value = ta.value.substring(0,s) + '  ' + ta.value.substring(end);
+      ta.selectionStart = ta.selectionEnd = s + 2;
+      syncHighlight();
+    }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runQuery(); }
+  });
+});
+
+// ===================================================================
+// CONFETTI — "Gemara Pages" SVG particles
+// ===================================================================
+let confettiAnimFrame = null;
+const GEMARA_CHARS = ['א','ב','ג','ד','ה','ו','ז','ח','ט','י','כ','ל','מ','נ','ס','ע','פ','צ','ק','ר','ש','ת'];
+
+function launchConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  canvas.style.display = 'block';
+
+  const particles = Array.from({length: 60}, () => ({
+    x: Math.random() * canvas.width,
+    y: -20 - Math.random() * 80,
+    vx: (Math.random() - 0.5) * 3,
+    vy: 2 + Math.random() * 3,
+    angle: Math.random() * Math.PI * 2,
+    va: (Math.random() - 0.5) * 0.12,
+    size: 12 + Math.random() * 14,
+    char: GEMARA_CHARS[Math.floor(Math.random() * GEMARA_CHARS.length)],
+    color: Math.random() > 0.5 ? '#f0c842' : (Math.random() > 0.5 ? '#e8d5a0' : '#8fa8ff'),
+    opacity: 1,
+    isPage: Math.random() > 0.5
+  }));
+
+  if (confettiAnimFrame) cancelAnimationFrame(confettiAnimFrame);
+  let start = null;
+  const DURATION = 3200;
+
+  function draw(ts) {
+    if (!start) start = ts;
+    const elapsed = ts - start;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.angle += p.va;
+      p.vy += 0.06;
+      p.opacity = Math.max(0, 1 - (elapsed / DURATION) * 0.7);
+
+      ctx.save();
+      ctx.globalAlpha = p.opacity;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+
+      if (p.isPage) {
+        // Mini parchment page
+        ctx.fillStyle = '#f5e6c8';
+        ctx.strokeStyle = '#cca300';
+        ctx.lineWidth = 0.8;
+        const w = p.size * 0.8, h = p.size;
+        ctx.fillRect(-w/2, -h/2, w, h);
+        ctx.strokeRect(-w/2, -h/2, w, h);
+        // Text lines on page
+        ctx.fillStyle = '#8a6e00';
+        ctx.font = `${p.size * 0.4}px "IM Fell English", serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.char, 0, 0);
+      } else {
+        // Gold/sparkle dot
+        ctx.beginPath();
+        ctx.arc(0,0,p.size/4,0,Math.PI*2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+        // Star glint
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0,-p.size/2.5); ctx.lineTo(0,p.size/2.5);
+        ctx.moveTo(-p.size/2.5,0); ctx.lineTo(p.size/2.5,0);
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+
+    if (elapsed < DURATION) {
+      confettiAnimFrame = requestAnimationFrame(draw);
+    } else {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      canvas.style.display = 'none';
+    }
+  }
+  confettiAnimFrame = requestAnimationFrame(draw);
+}
+
+// ===================================================================
+// INVENTORY / OTZAR SYSTEM
+// ===================================================================
+function checkAndAwardSefer(ch) {
+  const sefer = SEFORIM_CATALOG.find(s => s.earnAt === ch && !inventory.find(i => i.id === s.id));
+  if (!sefer) return;
+  inventory.push(sefer);
+  renderOtzar();
+  showItemEarnToast(sefer);
+}
+
+function renderOtzar() {
+  const shelf = document.getElementById('otzar-shelf');
+  const empty = document.getElementById('otzar-empty');
+  if (inventory.length === 0) {
+    empty.style.display = 'block';
+    shelf.querySelectorAll('.sefer-item').forEach(el => el.remove());
+    return;
+  }
+  empty.style.display = 'none';
+  // Rebuild shelf
+  shelf.querySelectorAll('.sefer-item').forEach(el => el.remove());
+  inventory.forEach(sefer => {
+    const el = document.createElement('div');
+    el.className = 'sefer-item new-item';
+    el.innerHTML = `${sefer.emoji}<div class="sefer-tooltip"><strong>${sefer.emoji} ${sefer.name}</strong>${sefer.hint}</div>`;
+    el.onclick = () => showSeferHint(sefer);
+    shelf.appendChild(el);
+    setTimeout(() => el.classList.remove('new-item'), 700);
+  });
+}
+
+function showSeferHint(sefer) {
+  document.getElementById('hint-num').textContent = '📖';
+  document.getElementById('hint-body').innerHTML = `<strong style="color:var(--gold-bright)">${sefer.name}</strong><br>${sefer.hint}`;
+  const toast = document.getElementById('hint-toast');
+  toast.style.borderColor = 'var(--gold)';
+  toast.classList.add('visible');
+  setTimeout(() => { toast.classList.remove('visible'); toast.style.borderColor = ''; }, 6000);
+}
+
+function showItemEarnToast(sefer) {
+  document.getElementById('item-earn-emoji').textContent = sefer.emoji;
+  document.getElementById('item-earn-name').textContent = sefer.name;
+  document.getElementById('item-earn-desc').textContent = 'Added to your Otzar! Tap it for SQL wisdom.';
+  const t = document.getElementById('item-earn-toast');
+  t.classList.add('visible');
+  setTimeout(() => t.classList.remove('visible'), 4500);
+}
+
+function toggleOtzar() {
+  const shelf = document.getElementById('otzar-shelf');
+  const empty = document.getElementById('otzar-empty');
+  const visible = shelf.style.display !== 'none';
+  shelf.style.display = visible ? 'none' : 'flex';
+  if (empty) empty.style.display = visible ? 'none' : (inventory.length === 0 ? 'block' : 'none');
+}
+
+// ===================================================================
+// DYNAMIC DIFFICULTY — MASHGIACH POPUP
+// ===================================================================
+function maybeShowMashgiach() {
+  if (wrongAttempts < 2) return;
+  const deepHint = MASHGIACH_DEEP_HINTS[currentChapter];
+  if (!deepHint) return;
+  document.getElementById('mashgiach-text').innerHTML = deepHint.text;
+  document.getElementById('mashgiach-popup').classList.add('visible');
+}
+
+function closeMashgiach() {
+  document.getElementById('mashgiach-popup').classList.remove('visible');
+}
+
+// ===================================================================
+// BOSS FARHER SYSTEM
+// ===================================================================
+
+// Dynamically create progress dots matching the number of questions in a round
+function buildFarherDots(count, activeIndex) {
+  const container = document.getElementById('farher-q-dots');
+  container.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'farher-q-dot' + (i === activeIndex ? ' active' : '');
+    dot.id = 'fqd-' + i;
+    dot.textContent = i + 1;
+    container.appendChild(dot);
+  }
+}
+
+function triggerFarher(roundKey, pendingChapter) {
+  farherPendingNext = pendingChapter;
+  farherLastRoundKey = roundKey;
+  farherActive = true;
+  farherQIndex = 0;
+  farherPassed = new Array(FARHER_ROUNDS[roundKey].qs.length).fill(false);
+  farherTimeLeft = 90;
+
+  const round = FARHER_ROUNDS[roundKey];
+
+  // Flash border effect
+  const flash = document.getElementById('boss-flash');
+  flash.classList.add('active');
+  setTimeout(() => flash.classList.remove('active'), 800);
+
+  document.getElementById('farher-title').textContent = round.title;
+  document.getElementById('farher-subtitle').textContent = round.subtitle;
+  document.getElementById('farher-outcome').classList.remove('active','pass','fail');
+  document.getElementById('farher-question-box').style.display = 'block';
+  document.getElementById('farher-result-msg').textContent = '';
+
+  // Dynamically build progress dots based on this round's question count
+  buildFarherDots(round.qs.length, 0);
+
+  loadFarherQuestion(round, 0);
+  document.getElementById('farher-modal').classList.add('active');
+
+  // Start timer
+  updateTimerRing(90, 90);
+  if (farherTimerInterval) clearInterval(farherTimerInterval);
+  farherTimerInterval = setInterval(() => {
+    farherTimeLeft--;
+    updateTimerRing(farherTimeLeft, 90);
+    if (farherTimeLeft <= 0) {
+      clearInterval(farherTimerInterval);
+      endFarher(roundKey, false, 'Time is up! The Rosh Yeshiva frowns. Keep reviewing your SQL!');
+    }
+  }, 1000);
+}
+
+function loadFarherQuestion(round, idx) {
+  // Bounds check — guard against out-of-range indices
+  if (!round || !round.qs || idx < 0 || idx >= round.qs.length) {
+    console.warn('loadFarherQuestion: index out of bounds', idx, round?.qs?.length);
+    return;
+  }
+  const q = round.qs[idx];
+  document.getElementById('farher-schema').innerHTML = `<strong style="color:var(--gold-dim)">Schema:</strong> ${q.schema}`;
+  document.getElementById('farher-task').innerHTML = q.task;
+  document.getElementById('farher-query-input').value = '';
+  document.getElementById('farher-result-msg').textContent = '';
+
+  // Show/hide hint button based on whether this question has a hint
+  const hintBtn = document.getElementById('farher-hint-btn');
+  if (hintBtn) hintBtn.style.display = q.hint ? 'inline-block' : 'none';
+  // Reset any displayed hint
+  const hintBox = document.getElementById('farher-hint-box');
+  if (hintBox) { hintBox.style.display = 'none'; hintBox.textContent = ''; }
+
+  document.getElementById('farher-query-input').focus();
+}
+
+function updateTimerRing(current, max) {
+  const circumference = 251.2;
+  const offset = circumference * (1 - current / max);
+  const ring = document.getElementById('farher-timer-ring');
+  const num = document.getElementById('farher-timer-num');
+  ring.style.strokeDashoffset = offset;
+  num.textContent = current;
+  // Color shift: green → gold → red
+  if (current > 60) { ring.style.stroke = '#6ddc8f'; num.classList.remove('danger'); }
+  else if (current > 25) { ring.style.stroke = '#cca300'; num.classList.remove('danger'); }
+  else { ring.style.stroke = '#e05555'; num.classList.add('danger'); }
+}
+
+function submitFarherQuery() {
+  const roundKey = farherLastRoundKey;
+  const round = FARHER_ROUNDS[roundKey];
+  if (!round) return;
+
+  // Guard: if all questions already answered or farher is resolving, do nothing
+  if (farherQIndex >= round.qs.length) return;
+
+  const query = document.getElementById('farher-query-input').value.trim();
+  if (!query || !db) return;
+
+  // Disable the Run button to prevent double-submission
+  const runBtn = document.querySelector('#farher-question-box .btn-primary');
+  if (runBtn) runBtn.disabled = true;
+
+  const enableRunBtn = () => { if (runBtn) runBtn.disabled = false; };
+
+  try {
+    const stmt = db.exec(query);
+    if (stmt.length === 0 || stmt[0].values.length === 0) {
+      document.getElementById('farher-result-msg').innerHTML = '<span class="bad">❌ No rows returned. Try again!</span>';
+      enableRunBtn();
+      return;
+    }
+    const columns = stmt[0].columns;
+    const userRows = stmt[0].values.map(row => {
+      const obj = {}; columns.forEach((c,i) => obj[c] = row[i]); return obj;
+    });
+
+    // Snapshot the current index before any async changes
+    const answeredIndex = farherQIndex;
+    const expectedRows = JSON.parse(round.qs[answeredIndex].expectedResult);
+    const resultMsg = document.getElementById('farher-result-msg');
+
+    if (compareSqlResults(userRows, expectedRows)) {
+      resultMsg.innerHTML = '<span class="ok">✅ Correct!</span>';
+      farherPassed[answeredIndex] = true;
+
+      const dot = document.getElementById('fqd-' + answeredIndex);
+      if (dot) { dot.classList.remove('active'); dot.classList.add('passed'); }
+
+      // Advance index AFTER snapshotting answeredIndex
+      farherQIndex = answeredIndex + 1;
+
+      if (farherQIndex >= round.qs.length) {
+        // All questions answered — end the farher
+        clearInterval(farherTimerInterval);
+        // Keep Run button disabled; endFarher will hide the question box
+        setTimeout(() => endFarher(farherLastRoundKey, true, FARHER_ROUNDS[farherLastRoundKey].passText), 600);
+      } else {
+        // Activate the next dot
+        const nextDot = document.getElementById('fqd-' + farherQIndex);
+        if (nextDot) nextDot.classList.add('active');
+        // Load next question after a short pause (re-enables button inside loadFarherQuestion)
+        setTimeout(() => {
+          loadFarherQuestion(round, farherQIndex);
+          enableRunBtn();
+        }, 700);
+      }
+    } else {
+      resultMsg.innerHTML = '<span class="bad">❌ Not quite right. The Rosh Yeshiva strokes his beard... try again!</span>';
+      const dot = document.getElementById('fqd-' + answeredIndex);
+      if (dot) {
+        dot.classList.remove('passed');
+        dot.classList.add('failed');
+        setTimeout(() => { dot.classList.remove('failed'); dot.classList.add('active'); }, 800);
+      }
+      enableRunBtn();
+    }
+  } catch(e) {
+    document.getElementById('farher-result-msg').innerHTML = `<span class="bad">SQL Error: ${e.message}</span>`;
+    enableRunBtn();
+  }
+}
+
+let farherLastRoundKey = null;
+
+function useFarherHint() {
+  const round = FARHER_ROUNDS[farherLastRoundKey];
+  if (!round) return;
+  const q = round.qs[farherQIndex];
+  if (!q || !q.hint) return;
+
+  // Apply 15-second time penalty
+  const PENALTY = 15;
+  farherTimeLeft = Math.max(0, farherTimeLeft - PENALTY);
+  updateTimerRing(farherTimeLeft, 90);
+
+  // Show the hint text
+  const hintBox = document.getElementById('farher-hint-box');
+  hintBox.innerHTML = `⚠️ −${PENALTY}s penalty • 💡 ${q.hint}`;
+  hintBox.style.display = 'block';
+
+  // Disable the button so hint can't be spammed on the same question
+  const hintBtn = document.getElementById('farher-hint-btn');
+  if (hintBtn) { hintBtn.disabled = true; hintBtn.style.opacity = '0.4'; hintBtn.textContent = '💡 Hint used'; }
+
+  // If the penalty drained the clock, end the farher
+  if (farherTimeLeft <= 0) {
+    clearInterval(farherTimerInterval);
+    endFarher(farherLastRoundKey, false, 'Time ran out after taking the hint! The Rosh Yeshiva sighs...');
+  }
+}
+
+function endFarher(roundKey, passed, text) {
+  clearInterval(farherTimerInterval);
+  farherLastRoundKey = roundKey;
+
+  if (passed) {
+    // Only mark farher as completed if actually passed
+    chaptersCompleted.push('farher_' + roundKey);
+    addXP(FARHER_ROUNDS[roundKey].passReward);
+    launchConfetti();
+  }
+
+  document.getElementById('farher-question-box').style.display = 'none';
+  const outcome = document.getElementById('farher-outcome');
+  outcome.classList.add('active', passed ? 'pass' : 'fail');
+  document.getElementById('farher-outcome-title').textContent = passed ? '🏆 Yashar Koach!' : '📚 Not Quite!';
+  document.getElementById('farher-outcome-text').textContent = text;
+
+  // Show appropriate buttons
+  const primaryBtn = document.getElementById('farher-outcome-btn');
+  const continueAnywayBtn = document.getElementById('farher-continue-anyway-btn');
+  if (passed) {
+    primaryBtn.textContent = 'Continue the Zman ➡';
+    primaryBtn.onclick = closeFarher;
+    continueAnywayBtn.style.display = 'none';
+  } else {
+    primaryBtn.textContent = '🔄 Retake the Farher';
+    primaryBtn.onclick = retakeFarher;
+    continueAnywayBtn.style.display = 'inline-block';
+  }
+  // Re-enable run button in case it was disabled before farher ended
+  const runBtn = document.querySelector('#farher-question-box .btn-primary');
+  if (runBtn) runBtn.disabled = false;
+}
+
+function retakeFarher() {
+  // Re-trigger the farher from scratch without closing the modal
+  const roundKey = farherLastRoundKey;
+  const round = FARHER_ROUNDS[roundKey];
+
+  farherQIndex = 0;
+  farherPassed = new Array(round.qs.length).fill(false);
+  farherTimeLeft = 90;
+
+  document.getElementById('farher-outcome').classList.remove('active', 'pass', 'fail');
+  document.getElementById('farher-question-box').style.display = 'block';
+  document.getElementById('farher-result-msg').textContent = '';
+  document.getElementById('farher-continue-anyway-btn').style.display = 'none';
+
+  // Re-enable the Run button in case it was left disabled after last round's final answer
+  const runBtn = document.querySelector('#farher-question-box .btn-primary');
+  if (runBtn) runBtn.disabled = false;
+
+  // Rebuild dots dynamically for this round
+  buildFarherDots(round.qs.length, 0);
+
+  loadFarherQuestion(round, 0);
+
+  // Restart timer
+  updateTimerRing(90, 90);
+  if (farherTimerInterval) clearInterval(farherTimerInterval);
+  farherTimerInterval = setInterval(() => {
+    farherTimeLeft--;
+    updateTimerRing(farherTimeLeft, 90);
+    if (farherTimeLeft <= 0) {
+      clearInterval(farherTimerInterval);
+      endFarher(roundKey, false, 'Time is up! The Rosh Yeshiva frowns. Keep reviewing your SQL!');
+    }
+  }, 1000);
+}
+
+function closeFarher() {
+  document.getElementById('farher-modal').classList.remove('active');
+  farherActive = false;
+  clearInterval(farherTimerInterval);
+  if (farherPendingNext === 'END') {
+    doChapterTransition('סיום מסכת!', showSiyum);
+  } else {
+    doChapterTransition(chapters[farherPendingNext]?.title || 'Next Perek', () => loadChapter(farherPendingNext));
+  }
+}
+
+// ===================================================================
+// UTILITIES
+// ===================================================================
+function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ===================================================================
+// BOOT
+// ===================================================================
+window.onload = initDB;
+
+// ===================================================================
+// ██████╗ ███████╗██╗███████╗    ███╗   ███╗███████╗██████╗ ██████╗  █████╗ ███████╗██╗  ██╗
+// ██╔══██╗██╔════╝██║██╔════╝    ████╗ ████║██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔════╝██║  ██║
+// ██████╔╝█████╗  ██║███████╗    ██╔████╔██║█████╗  ██║  ██║██████╔╝███████║███████╗███████║
+// ██╔══██╗██╔══╝  ██║╚════██║    ██║╚██╔╝██║██╔══╝  ██║  ██║██╔══██╗██╔══██║╚════██║██╔══██║
+// ██████╔╝███████╗██║███████║    ██║ ╚═╝ ██║███████╗██████╔╝██║  ██║██║  ██║███████║██║  ██║
+// ╚═════╝ ╚══════╝╚═╝╚══════╝    ╚═╝     ╚═╝╚══════╝╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
+// MULTIMEDIA: Soundscape + SVG Beis Medrash + Avatar Expression System
+// ===================================================================
+
+// ──────────────────────────────────────────────────────────────────
+// AUDIO ENGINE (Web Audio API — no external files needed)
+// ──────────────────────────────────────────────────────────────────
+let audioCtx = null;
+let soundscapeOn = false;
+let bmHumNodes = [];    // Beis Medrash hum oscillators
+let bmHumGain = null;
+
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+// ── Beis Medrash Hum Soundscape ──────────────────────────────────
+// Synthesizes the layered murmur of hundreds learning using
+// multiple detuned oscillators + noise + slow LFO modulation
+function startBeisMediashHum() {
+  const ctx = ensureAudioCtx();
+  bmHumGain = ctx.createGain();
+  bmHumGain.gain.setValueAtTime(0, ctx.currentTime);
+  bmHumGain.gain.linearRampToValueAtTime(0.04, ctx.currentTime + 3); // fade in gently
+  bmHumGain.connect(ctx.destination);
+
+  // Layered voice-like oscillators to simulate many voices
+  const voiceFreqs = [120, 145, 165, 195, 220, 250, 175, 135, 108, 280];
+  voiceFreqs.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const oscGain = ctx.createGain();
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+
+    osc.type = ['sine','triangle','sine','sine','triangle','sine','triangle','sine','sine','triangle'][i];
+    osc.frequency.value = freq + (Math.random() - 0.5) * 8;
+
+    // Slow LFO makes each voice waver naturally
+    lfo.type = 'sine';
+    lfo.frequency.value = 0.05 + Math.random() * 0.15; // very slow
+    lfoGain.gain.value = 3 + Math.random() * 4;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.frequency);
+
+    oscGain.gain.value = (0.003 + Math.random() * 0.005);
+    osc.connect(oscGain);
+    oscGain.connect(bmHumGain);
+    osc.start();
+    lfo.start();
+    bmHumNodes.push(osc, lfo);
+  });
+
+  // Subtle noise layer (parchment rustling / background texture)
+  const bufferSize = ctx.sampleRate * 2;
+  const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.012;
+
+  // Loop the noise
+  function playNoiseLoop() {
+    if (!soundscapeOn) return;
+    const source = ctx.createBufferSource();
+    source.buffer = noiseBuffer;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.018;
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = 600;
+    noiseFilter.Q.value = 0.3;
+    source.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(bmHumGain);
+    source.start();
+    source.onended = playNoiseLoop;
+    bmHumNodes.push(source);
+  }
+  playNoiseLoop();
+}
+
+function stopBeisMediashHum() {
+  if (bmHumGain) {
+    const ctx = ensureAudioCtx();
+    bmHumGain.gain.linearRampToValueAtTime(0, ctx.currentTime + 2);
+    setTimeout(() => {
+      bmHumNodes.forEach(n => { try { n.stop(); } catch(e){} });
+      bmHumNodes = [];
+      bmHumGain = null;
+    }, 2200);
+  }
+}
+
+function toggleSoundscape() {
+  soundscapeOn = !soundscapeOn;
+  const icon = document.getElementById('bm-sound-wave2');
+  const soundIconG = document.getElementById('bm-sound-icon');
+  if (soundscapeOn) {
+    startBeisMediashHum();
+    soundIconG.style.opacity = '1';
+    icon.style.visibility = 'visible';
+    const hs = document.getElementById('header-status');
+    if (hs) { hs.textContent = '🎶 Kol Torah is alive...'; hs.classList.add('visible'); }
+  } else {
+    stopBeisMediashHum();
+    soundIconG.style.opacity = '0.3';
+    icon.style.visibility = 'hidden';
+    const hs2 = document.getElementById('header-status');
+    if (hs2) { hs2.textContent = '🔇 Soundscape paused'; hs2.classList.add('visible'); }
+  }
+}
+
+// ── Tea Glass Clink (Success Sound) ───────────────────────────────
+function playClink() {
+  const ctx = ensureAudioCtx();
+  const masterGain = ctx.createGain();
+  masterGain.gain.value = 0.35;
+  masterGain.connect(ctx.destination);
+
+  // High bright ping (glass)
+  function glassNote(freq, startTime, duration, gain) {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    g.gain.setValueAtTime(gain, ctx.currentTime + startTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+    osc.connect(g);
+    g.connect(masterGain);
+    osc.start(ctx.currentTime + startTime);
+    osc.stop(ctx.currentTime + startTime + duration + 0.05);
+  }
+
+  // Crystal glass harmonic series — clink + resonance
+  glassNote(1047, 0,    1.8,  0.8);   // C6 — main clink
+  glassNote(2093, 0,    1.2,  0.4);   // C7 — harmonic
+  glassNote(1319, 0.02, 1.0,  0.25);  // E6 — color
+  glassNote(1568, 0.01, 0.9,  0.2);   // G6 — overtone
+  glassNote(3136, 0,    0.6,  0.15);  // G7 — shimmer
+
+  // Second clink (tea touching saucer)
+  glassNote(880,  0.12, 0.8,  0.3);
+  glassNote(1760, 0.12, 0.5,  0.15);
+
+  // Tiny "success" rising 3-tone arpeggio after clink
+  [0, 0.18, 0.36].forEach((t, i) => {
+    const freqs = [523, 659, 784];
+    glassNote(freqs[i], t + 0.22, 0.5 - i * 0.05, 0.1 + i * 0.05);
+  });
+}
+
+// ── Disappointed Sigh (Error Sound) ──────────────────────────────
+function playSigh() {
+  const ctx = ensureAudioCtx();
+  const masterGain = ctx.createGain();
+  masterGain.gain.value = 0.2;
+  masterGain.connect(ctx.destination);
+
+  // Noise burst (breath/sigh)
+  const bufferSize = ctx.sampleRate * 1.2;
+  const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+  const noiseSource = ctx.createBufferSource();
+  noiseSource.buffer = noiseBuffer;
+
+  // Bandpass to make it breath-like
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 800;
+  bp.Q.value = 0.4;
+
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0, ctx.currentTime);
+  noiseGain.gain.linearRampToValueAtTime(0.6, ctx.currentTime + 0.08);  // quick inhale
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2); // long exhale
+
+  noiseSource.connect(bp);
+  bp.connect(noiseGain);
+  noiseGain.connect(masterGain);
+  noiseSource.start();
+  noiseSource.stop(ctx.currentTime + 1.3);
+
+  // Low "oy" tone under the sigh
+  const osc = ctx.createOscillator();
+  const oscGain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(220, ctx.currentTime);
+  osc.frequency.linearRampToValueAtTime(180, ctx.currentTime + 0.8); // pitch falls
+  oscGain.gain.setValueAtTime(0.4, ctx.currentTime + 0.05);
+  oscGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.0);
+  osc.connect(oscGain);
+  oscGain.connect(masterGain);
+  osc.start();
+  osc.stop(ctx.currentTime + 1.1);
+
+  // Tiny "tsk" transient at very start
+  const tskOsc = ctx.createOscillator();
+  const tskGain = ctx.createGain();
+  tskOsc.type = 'sawtooth';
+  tskOsc.frequency.value = 300;
+  tskGain.gain.setValueAtTime(0.3, ctx.currentTime);
+  tskGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
+  tskOsc.connect(tskGain);
+  tskGain.connect(masterGain);
+  tskOsc.start();
+  tskOsc.stop(ctx.currentTime + 0.08);
+}
+
+// ── Siyum Fanfare ─────────────────────────────────────────────────
+function playSiyumFanfare() {
+  const ctx = ensureAudioCtx();
+  const masterGain = ctx.createGain();
+  masterGain.gain.value = 0.25;
+  masterGain.connect(ctx.destination);
+
+  const melody = [523, 659, 784, 1047, 784, 1047, 1319];
+  melody.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    const t = ctx.currentTime + i * 0.18;
+    g.gain.setValueAtTime(0.5, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    osc.connect(g);
+    g.connect(masterGain);
+    osc.start(t);
+    osc.stop(t + 0.4);
+  });
+}
+
+// ──────────────────────────────────────────────────────────────────
+// BEIS MEDRASH SVG — WINDOW BRIGHTNESS ENGINE
+// Windows 0-5 light up as XP/score grows; flicker on activity
+// ──────────────────────────────────────────────────────────────────
+const BM_WINDOW_COUNT = 6;
+let bmFlickerIntervals = [];
+let bmBaseOpacities = [0, 0, 0, 0, 0, 0]; // driven by score
+
+function updateBeisMediashWindows() {
+  // Map XP to how many windows should be glowing (0-6)
+  // Also map to brightness intensity
+  const maxXP = 1000;
+  const ratio = Math.min(xp / maxXP, 1);
+  const litCount = Math.ceil(ratio * BM_WINDOW_COUNT);
+  const brightness = 0.25 + ratio * 0.75; // min 0.25, max 1.0
+
+  for (let i = 0; i < BM_WINDOW_COUNT; i++) {
+    const glowEl = document.getElementById('bmwg-' + i);
+    const winEl  = document.getElementById('bmw-' + i);
+    if (!glowEl || !winEl) continue;
+
+    if (i < litCount) {
+      bmBaseOpacities[i] = brightness;
+      glowEl.setAttribute('opacity', brightness.toFixed(2));
+      // Warm the window fill too
+      const warmth = Math.floor(80 + ratio * 80);
+      winEl.setAttribute('fill', `rgb(${warmth + 30},${warmth},0)`);
+    } else {
+      bmBaseOpacities[i] = 0;
+      glowEl.setAttribute('opacity', '0');
+      winEl.setAttribute('fill', '#110800');
+    }
+  }
+
+  // Update menorah flame size/brightness
+  const flame = document.getElementById('bm-menorah-flame');
+  if (flame) {
+    const r = 3 + ratio * 4;
+    flame.setAttribute('r', r.toFixed(1));
+    flame.setAttribute('opacity', (0.7 + ratio * 0.3).toFixed(2));
+  }
+
+  // Aura around avatar at high XP
+  const aura = document.getElementById('av-aura');
+  if (aura) {
+    aura.setAttribute('opacity', ratio > 0.6 ? ((ratio - 0.6) * 2.0).toFixed(2) : '0');
+  }
+}
+
+// Gentle random flicker on lit windows (simulates candle/bulb)
+function startWindowFlicker() {
+  clearInterval(bmFlickerInterval_id);
+  bmFlickerInterval_id = setInterval(() => {
+    for (let i = 0; i < BM_WINDOW_COUNT; i++) {
+      if (bmBaseOpacities[i] > 0) {
+        const glowEl = document.getElementById('bmwg-' + i);
+        if (glowEl) {
+          const flicker = bmBaseOpacities[i] + (Math.random() - 0.5) * 0.15;
+          glowEl.setAttribute('opacity', Math.max(0.05, Math.min(1, flicker)).toFixed(2));
+        }
+      }
+    }
+    // Flame flicker
+    const flame = document.getElementById('bm-menorah-flame');
+    if (flame) {
+      const baseR = parseFloat(flame.getAttribute('r')) || 3;
+      flame.setAttribute('r', (baseR + (Math.random() - 0.5) * 0.8).toFixed(1));
+    }
+  }, 120);
+}
+let bmFlickerInterval_id = null;
+
+// Burst flash — all windows brighten then settle (on correct answer)
+function beisMediashFlash() {
+  for (let i = 0; i < BM_WINDOW_COUNT; i++) {
+    const glowEl = document.getElementById('bmwg-' + i);
+    const winEl  = document.getElementById('bmw-' + i);
+    if (!glowEl || !winEl) continue;
+    glowEl.style.transition = 'opacity 0.1s';
+    glowEl.setAttribute('opacity', '1');
+    winEl.setAttribute('fill', '#ffe080');
+    setTimeout(() => {
+      glowEl.style.transition = 'opacity 0.8s';
+      updateBeisMediashWindows();
+    }, 300);
+  }
+}
+
+// Dim flash — windows dim briefly (on wrong answer)
+function beisMediashDim() {
+  for (let i = 0; i < BM_WINDOW_COUNT; i++) {
+    const glowEl = document.getElementById('bmwg-' + i);
+    if (!glowEl) continue;
+    const prev = glowEl.getAttribute('opacity');
+    glowEl.style.transition = 'opacity 0.15s';
+    glowEl.setAttribute('opacity', '0');
+    setTimeout(() => {
+      glowEl.style.transition = 'opacity 1s';
+      glowEl.setAttribute('opacity', prev);
+    }, 400);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// SVG AVATAR — EXPRESSION SYSTEM
+// Expressions: neutral | happy | sad | thinking
+// ──────────────────────────────────────────────────────────────────
+const AVATAR_EXPRESSIONS = ['neutral','happy','sad','thinking'];
+const AVATAR_MOODS = {
+  neutral:  'Ready to pasken...',
+  happy:    'Yashar koach! 🎉',
+  sad:      'Oy... try again.',
+  thinking: 'Hmm, interesting...'
+};
+
+function setAvatarExpression(expr) {
+  // Hide all expression layers
+  AVATAR_EXPRESSIONS.forEach(e => {
+    const eyesEl  = document.getElementById('av-eyes-' + e);
+    const mouthEl = document.getElementById('av-mouth-' + e);
+    if (eyesEl)  eyesEl.setAttribute('visibility', 'hidden');
+    if (mouthEl) mouthEl.setAttribute('visibility', 'hidden');
+  });
+
+  // Show target
+  const eyesEl  = document.getElementById('av-eyes-' + expr);
+  const mouthEl = document.getElementById('av-mouth-' + expr);
+  if (eyesEl)  eyesEl.setAttribute('visibility', 'visible');
+  if (mouthEl) mouthEl.setAttribute('visibility', 'visible');
+
+  // Update mood label
+  const moodEl = document.getElementById('avatar-mood');
+  if (moodEl) moodEl.textContent = AVATAR_MOODS[expr] || '';
+
+  // Animate the SVG on expression change
+  const svg = document.getElementById('rosh-chabura-svg');
+  if (svg) {
+    svg.style.transform = expr === 'happy' ? 'scale(1.08) rotate(-2deg)' :
+                          expr === 'sad'   ? 'scale(0.95) rotate(1deg)'  :
+                          expr === 'thinking' ? 'scale(1.02) rotate(3deg)' : 'scale(1)';
+    svg.style.transition = 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)';
+    setTimeout(() => {
+      svg.style.transform = 'scale(1) rotate(0deg)';
+    }, 600);
+  }
+}
+
+// Apply avatar-specific visual variation based on chosen avatar type
+function applyAvatarStyle(emojiOrType) {
+  const glasses = document.getElementById('av-glasses');
+  if (!glasses) return;
+  // Show glasses for Rav (🕍), hide for others
+  if (emojiOrType === '🕍') {
+    glasses.setAttribute('visibility', 'visible');
+  } else {
+    glasses.setAttribute('visibility', 'hidden');
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// INTERCEPT GAME EVENTS — wire multimedia into existing game fns
+// ──────────────────────────────────────────────────────────────────
+
+// ──────────────────────────────────────────────────────────────────
+// STARTUP — begin flicker loop, set initial state
+// ──────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    updateBeisMediashWindows();
+    startWindowFlicker();
+    setAvatarExpression('neutral');
+    // Show tooltip on Beis Medrash logo
+    const bm = document.getElementById('beis-medrash-svg');
+    if (bm) {
+      bm.addEventListener('mouseenter', () => {
+        const hs3 = document.getElementById('header-status');
+        if (hs3) { hs3.textContent = soundscapeOn ? '🔇 Click to silence the Beis Medrash' : '🎶 Click to hear the Kol Torah'; hs3.classList.add('visible'); }
+      });
+    }
+  }, 600);
+});
+</script>
+</body>
+</html>
