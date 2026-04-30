@@ -1,0 +1,2992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lost in the Beis Medrash • SQL Seder — Level II: The Archives</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/sql-wasm.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+<style>
+/* ============ LEVEL 2 DESIGN TOKENS — SAPPHIRE ARCHIVES ============ */
+:root {
+  /* Deep sapphire/midnight blue replaces warm parchment */
+  --parchment-dark:   #06091a;
+  --parchment-mid:    #0d1530;
+  --parchment-light:  #182048;
+  --parchment-paper:  #d8e4ff;
+  --parchment-aged:   #b8ccf0;
+  /* Silver/moonlight replaces gold */
+  --gold:             #7aaeff;
+  --gold-bright:      #aad0ff;
+  --gold-dim:         #3a5a9a;
+  /* Text */
+  --ink:              #d8e8ff;
+  --ink-faint:        #8aaae0;
+  /* Accent colors */
+  --crimson:          #7c1a6e;
+  --forest:           #1a5c4a;
+  --sapphire:         #1a3a8b;
+  /* Terminal — still dark but blue-tinted */
+  --terminal-bg:      #04060f;
+  --terminal-text:    #b0c8f8;
+  /* SQL syntax — cooler palette */
+  --sql-keyword:      #aad0ff;
+  --sql-string:       #80e8c0;
+  --sql-number:       #f0b870;
+  --sql-comment:      #405880;
+  --sql-function:     #c090f0;
+  --sql-operator:     #c090f0;
+  /* Feedback */
+  --correct:          #60e0a0;
+  --wrong:            #e06070;
+  /* XP bar — silver-blue */
+  --xp-bar:           #5080d0;
+  --shadow-deep:      rgba(0,0,20,0.9);
+}
+
+/* ============ RESET & BASE ============ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: 'IM Fell English', Georgia, serif;
+  font-size: 18px;
+  background: var(--parchment-dark);
+  color: var(--ink);
+  background-image:
+    radial-gradient(ellipse at 15% 40%, rgba(20,40,120,0.25) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 20%, rgba(10,20,80,0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 90%, rgba(60,20,120,0.1) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='400' height='400' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+/* ============ SCROLLBAR ============ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--parchment-dark); }
+::-webkit-scrollbar-thumb { background: var(--gold-dim); border-radius: 3px; }
+
+/* ============ LAYOUT SHELL ============ */
+#app-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: 60px 1fr;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ============ TOP HEADER BAR ============ */
+#header-bar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--parchment-mid);
+  border-bottom: 2px solid var(--gold);
+  padding: 0 20px;
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 2px 20px rgba(0,10,60,0.8);
+}
+#header-bar::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold-dim), var(--gold-bright), var(--gold-dim), transparent);
+}
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.header-logo h1 {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 0.85em;
+  color: var(--gold-bright);
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 20px rgba(150,200,255,0.5);
+  line-height: 1.2;
+}
+.header-logo h1 span {
+  display: block;
+  font-size: 0.7em;
+  color: var(--gold-dim);
+  font-family: 'IM Fell English', serif;
+  font-weight: normal;
+}
+/* Level badge in header */
+.level-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--gold-dim), var(--sapphire));
+  border: 1px solid var(--gold);
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-size: 0.6em;
+  font-family: 'Courier Prime', monospace;
+  color: var(--gold-bright);
+  letter-spacing: 0.1em;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+#header-status {
+  font-size: 0.85em;
+  color: var(--gold);
+  letter-spacing: 0.05em;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+#header-status.visible { opacity: 1; }
+
+/* ============ SIDEBAR ============ */
+#sidebar {
+  grid-column: 1;
+  grid-row: 2;
+  background: var(--parchment-mid);
+  border-right: 1px solid rgba(100,150,255,0.2);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  position: relative;
+}
+#sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+}
+.sidebar-panel {
+  background: rgba(0,5,30,0.4);
+  border: 1px solid rgba(100,150,255,0.15);
+  border-radius: 4px;
+  padding: 14px;
+  position: relative;
+}
+.sidebar-panel-title {
+  font-size: 0.7em;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(100,150,255,0.12);
+  padding-bottom: 6px;
+}
+
+/* Avatar block */
+#avatar-display { text-align: center; }
+#avatar-emoji {
+  font-size: 3.5em;
+  display: block;
+  line-height: 1;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 0 12px rgba(120,180,255,0.5));
+  transition: transform 0.3s ease;
+}
+#avatar-emoji:hover { transform: scale(1.1) rotate(-3deg); }
+#avatar-name { font-size: 1em; color: var(--gold-bright); font-style: italic; }
+#avatar-title { font-size: 0.75em; color: var(--ink-faint); margin-top: 4px; }
+
+/* XP / Madreiga */
+.xp-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 5px;
+}
+.xp-label span:first-child { font-size: 0.85em; color: var(--ink-faint); }
+.xp-label span:last-child { font-size: 0.9em; color: var(--gold); font-weight: bold; }
+.xp-bar-track {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(100,150,255,0.15);
+  border-radius: 3px;
+  height: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.xp-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-dim), var(--gold-bright));
+  border-radius: 3px;
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+}
+.xp-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 40%;
+  background: rgba(255,255,255,0.2);
+  border-radius: 3px 3px 0 0;
+}
+#madreiga-label {
+  font-size: 0.9em;
+  color: var(--gold);
+  text-align: center;
+  font-style: italic;
+}
+
+/* Zman Progress Dots */
+.zman-perek-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.zman-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--gold-dim);
+  background: rgba(0,5,30,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--gold-dim);
+  transition: all 0.4s ease;
+}
+.zman-dot.completed {
+  background: var(--gold);
+  border-color: var(--gold-bright);
+  color: var(--parchment-dark);
+  box-shadow: 0 0 8px rgba(120,180,255,0.6);
+}
+.zman-dot.current {
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 0 2px rgba(120,180,255,0.3);
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(120,180,255,0.3); }
+  50% { box-shadow: 0 0 0 4px rgba(120,180,255,0.1), 0 0 12px rgba(120,180,255,0.4); }
+}
+
+/* Chazal Quote box */
+.chazal-box {
+  font-style: italic;
+  font-size: 0.82em;
+  color: var(--ink-faint);
+  line-height: 1.5;
+  text-align: center;
+  position: relative;
+  padding: 0 12px;
+}
+.chazal-box::before, .chazal-box::after {
+  content: '"';
+  font-size: 2em;
+  color: var(--gold-dim);
+  position: absolute;
+  line-height: 0.5;
+}
+.chazal-box::before { top: 5px; left: 0; }
+.chazal-box::after { content: '"'; bottom: -5px; right: 0; }
+
+/* ============ MAIN CONTENT AREA ============ */
+#main-area {
+  grid-column: 2;
+  grid-row: 2;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* ============ SCREENS ============ */
+.screen {
+  position: absolute;
+  inset: 0;
+  padding: 24px;
+  overflow-y: auto;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.screen.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+/* ============ CHARACTER PICKER ============ */
+#screen-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.picker-card {
+  background: var(--parchment-mid);
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  padding: 36px 40px;
+  max-width: 520px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 8px 40px rgba(0,10,60,0.7);
+  position: relative;
+}
+.picker-card::before {
+  content: '✦ ✦ ✦';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--parchment-mid);
+  padding: 0 12px;
+  font-size: 0.7em;
+  color: var(--gold);
+  letter-spacing: 8px;
+}
+.picker-card h2 {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1em;
+  color: var(--gold-bright);
+  margin-bottom: 24px;
+  letter-spacing: 0.05em;
+}
+.avatar-grid {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+.avatar-btn {
+  font-size: 3em;
+  cursor: pointer;
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: rgba(0,5,30,0.4);
+  transition: all 0.2s ease;
+  position: relative;
+}
+.avatar-btn::after {
+  content: attr(data-label);
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.25em;
+  font-family: 'IM Fell English', serif;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.avatar-btn:hover { transform: scale(1.1) translateY(-4px); border-color: var(--gold-dim); }
+.avatar-btn.selected {
+  border-color: var(--gold-bright);
+  background: rgba(100,150,255,0.12);
+  box-shadow: 0 0 20px rgba(120,180,255,0.3);
+}
+.name-input-wrap {
+  margin: 28px 0 24px;
+  position: relative;
+}
+.name-input-wrap label {
+  display: block;
+  font-size: 0.75em;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin-bottom: 8px;
+}
+#name-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--gold-dim);
+  color: var(--ink);
+  font-family: 'IM Fell English', serif;
+  font-size: 1.1em;
+  border-radius: 4px;
+  text-align: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+#name-input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(120,180,255,0.25);
+}
+
+/* ============ BACKSTORY SCREEN ============ */
+#screen-backstory {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 30px;
+}
+.backstory-card {
+  background: var(--parchment-mid);
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  padding: 36px 40px;
+  max-width: 680px;
+  width: 100%;
+  box-shadow: 0 8px 40px rgba(0,10,60,0.7);
+}
+.backstory-card h2 {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1.2em;
+  color: var(--gold-bright);
+  text-align: center;
+  margin-bottom: 20px;
+}
+.backstory-card p {
+  font-size: 1em;
+  line-height: 1.75;
+  color: var(--ink);
+  text-align: justify;
+}
+.backstory-card p em { color: var(--gold); font-style: italic; }
+.backstory-card p strong { color: var(--gold-bright); }
+
+/* ============ GAME SCREEN ============ */
+#screen-game {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.game-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 20px;
+  gap: 12px;
+}
+
+/* Narrative box */
+#narrative-box {
+  background: rgba(0,5,30,0.3);
+  border: 1px solid rgba(100,150,255,0.15);
+  border-radius: 6px;
+  padding: 16px 20px;
+  font-size: 1em;
+  line-height: 1.75;
+  color: var(--ink);
+  min-height: 80px;
+  max-height: 160px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  position: relative;
+}
+#narrative-box em { color: var(--gold); }
+#narrative-box strong { color: var(--gold-bright); }
+.narrative-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--gold);
+  margin-left: 2px;
+  vertical-align: middle;
+  animation: blink 0.7s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Task panel */
+#task-panel {
+  background: var(--parchment-light);
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  padding: 14px 16px;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+#task-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--gold);
+}
+#task-title-display {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 0.85em;
+  color: var(--gold-bright);
+  margin-bottom: 8px;
+  letter-spacing: 0.04em;
+}
+.schema-display {
+  background: var(--terminal-bg);
+  color: #79b8ff;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.8em;
+  padding: 8px 12px;
+  border-radius: 3px;
+  border-left: 3px solid var(--gold-dim);
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+}
+#task-desc-display {
+  font-size: 0.9em;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+#task-desc-display em { color: var(--gold); }
+
+/* ============ SQL TERMINAL / IDE ============ */
+#terminal-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--terminal-bg);
+  border: 1px solid rgba(100,150,255,0.2);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+}
+.terminal-titlebar {
+  background: rgba(100,150,255,0.06);
+  border-bottom: 1px solid rgba(100,150,255,0.12);
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot-red { background: #e05555; }
+.dot-yellow { background: #d0a040; }
+.dot-green { background: #50c880; }
+.terminal-label {
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.7em;
+  color: var(--gold-dim);
+  margin-left: 8px;
+  letter-spacing: 0.08em;
+}
+.terminal-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+.line-numbers {
+  background: rgba(100,150,255,0.03);
+  border-right: 1px solid rgba(100,150,255,0.08);
+  padding: 12px 8px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.85em;
+  color: var(--sql-comment);
+  text-align: right;
+  user-select: none;
+  min-width: 36px;
+  line-height: 1.5em;
+  flex-shrink: 0;
+}
+.editor-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+#query-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--gold-bright);
+  border: none;
+  padding: 12px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.9em;
+  line-height: 1.5em;
+  resize: none;
+  z-index: 2;
+  outline: none;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow: auto;
+}
+#highlight-overlay {
+  position: absolute;
+  inset: 0;
+  padding: 12px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.9em;
+  line-height: 1.5em;
+  color: var(--terminal-text);
+  pointer-events: none;
+  z-index: 1;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow: hidden;
+  word-break: keep-all;
+}
+.sql-keyword { color: var(--sql-keyword); font-weight: bold; }
+.sql-string   { color: var(--sql-string); }
+.sql-number   { color: var(--sql-number); }
+.sql-comment  { color: var(--sql-comment); font-style: italic; }
+.sql-function { color: var(--sql-function); }
+.sql-operator { color: var(--sql-operator); }
+
+/* ============ CONTROL BAR ============ */
+#control-bar {
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0,0,0,0.2);
+  flex-wrap: wrap;
+}
+
+/* ============ BUTTONS ============ */
+.btn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'IM Fell English', serif;
+  font-size: 0.9em;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  transition: all 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0);
+  transition: background 0.15s ease;
+}
+.btn:hover::after { background: rgba(255,255,255,0.08); }
+.btn:active { transform: scale(0.97); }
+
+.btn-primary {
+  background: linear-gradient(180deg, #3060c0 0%, #1a3a80 100%);
+  color: #d8e8ff;
+  box-shadow: 0 2px 8px rgba(60,100,200,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+.btn-primary:hover { box-shadow: 0 4px 16px rgba(60,100,200,0.6); }
+
+.btn-hint {
+  background: rgba(100,150,255,0.1);
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+}
+.btn-hint:hover { background: rgba(100,150,255,0.2); }
+
+.btn-next {
+  background: linear-gradient(180deg, #1a6040 0%, #0d3a24 100%);
+  color: #c0ffe8;
+  box-shadow: 0 2px 8px rgba(20,100,60,0.4);
+  display: none;
+  font-size: 1em;
+  padding: 10px 22px;
+}
+.btn-next.visible { display: inline-block; }
+.btn-next:hover { box-shadow: 0 4px 16px rgba(20,100,60,0.6); }
+
+.btn-start, .btn-enter {
+  background: linear-gradient(180deg, #3060c0 0%, #1a3a80 100%);
+  color: #d8e8ff;
+  font-size: 1.1em;
+  padding: 12px 28px;
+  box-shadow: 0 4px 16px rgba(60,100,200,0.5);
+  margin-top: 20px;
+  border-radius: 4px;
+}
+.btn-start:hover, .btn-enter:hover {
+  box-shadow: 0 6px 24px rgba(60,100,200,0.7);
+  transform: translateY(-1px);
+}
+
+/* ============ RESULT AREA ============ */
+#result-area {
+  max-height: 150px;
+  overflow-y: auto;
+  flex-shrink: 0;
+  display: none;
+}
+.result-inner {
+  padding: 10px 12px;
+  background: rgba(0,5,30,0.4);
+  border: 1px solid rgba(100,150,255,0.12);
+  border-radius: 4px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.85em;
+}
+.feedback-correct {
+  color: var(--correct);
+  font-family: 'IM Fell English', serif;
+  font-size: 1.05em;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.feedback-wrong {
+  color: var(--wrong);
+  font-family: 'IM Fell English', serif;
+  font-size: 1.05em;
+  margin-bottom: 8px;
+}
+.result-table { border-collapse: collapse; width: 100%; margin-top: 6px; }
+.result-table th {
+  background: rgba(100,150,255,0.12);
+  border: 1px solid rgba(100,150,255,0.2);
+  padding: 5px 10px;
+  color: var(--gold);
+  font-weight: bold;
+  text-align: left;
+}
+.result-table td {
+  border: 1px solid rgba(100,150,255,0.1);
+  padding: 4px 10px;
+  color: var(--ink-faint);
+}
+.result-table tr:hover td { background: rgba(100,150,255,0.05); }
+
+/* ============ HINT / REVEAL PANEL ============ */
+#hint-reveal-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.15);
+  border-top: 1px solid rgba(100,150,255,0.08);
+  flex-shrink: 0;
+  font-size: 0.8em;
+  color: var(--ink-faint);
+  flex-wrap: wrap;
+}
+#hint-reveal-bar strong { color: var(--gold); font-style: italic; }
+#echad-input {
+  width: 50px;
+  padding: 4px 8px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--gold-dim);
+  color: var(--ink);
+  font-family: 'Courier Prime', monospace;
+  font-size: 1em;
+  text-align: center;
+  border-radius: 3px;
+}
+#echad-input:focus { outline: none; border-color: var(--gold); }
+.btn-reveal {
+  background: rgba(60,20,100,0.4);
+  color: #d0aaff;
+  border: 1px solid rgba(100,50,200,0.4);
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: 'IM Fell English', serif;
+  font-size: 0.9em;
+  transition: background 0.15s ease;
+}
+.btn-reveal:hover { background: rgba(60,20,100,0.6); }
+
+/* ============ SIYUM SCREEN ============ */
+#completion-code-container {
+  margin: 20px auto 30px;
+  padding: 20px;
+  background: rgba(0,5,30,0.4);
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  max-width: 450px;
+}
+.code-reveal-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 15px;
+}
+#secret-code-display {
+  font-family: 'Courier Prime', monospace;
+  font-size: 1.6em;
+  color: var(--gold-bright);
+  letter-spacing: 4px;
+  padding: 8px 20px;
+  background: var(--terminal-bg);
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  font-weight: bold;
+}
+.btn-copy {
+  background: rgba(100,150,255,0.1);
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+  padding: 10px 14px;
+  font-family: 'IM Fell English', serif;
+  font-size: 1em;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+.btn-copy:hover { background: rgba(100,150,255,0.25); color: var(--gold-bright); }
+
+#screen-siyum {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.siyum-card {
+  text-align: center;
+  max-width: 640px;
+  padding: 40px;
+}
+.siyum-card h1 {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1.8em;
+  color: var(--gold-bright);
+  margin-bottom: 16px;
+  text-shadow: 0 0 30px rgba(150,200,255,0.6);
+  animation: glow-text 2s ease-in-out infinite alternate;
+}
+@keyframes glow-text {
+  from { text-shadow: 0 0 10px rgba(120,180,255,0.4); }
+  to   { text-shadow: 0 0 30px rgba(120,180,255,0.8), 0 0 60px rgba(120,180,255,0.3); }
+}
+.siyum-card p {
+  font-size: 1.1em;
+  line-height: 1.75;
+  color: var(--ink);
+  margin-bottom: 20px;
+}
+
+/* ============ CHAPTER TRANSITION OVERLAY ============ */
+#chapter-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--parchment-dark);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+#chapter-overlay.active { opacity: 1; pointer-events: auto; }
+.chapter-flash-text {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 2em;
+  color: var(--gold-bright);
+  text-align: center;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+#chapter-overlay.active .chapter-flash-text { opacity: 1; transform: scale(1); }
+
+/* ============ CONFETTI CANVAS ============ */
+#confetti-canvas {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  display: none;
+}
+
+/* ============ HINT TOAST ============ */
+#hint-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--parchment-light);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+  padding: 16px 20px;
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0,10,60,0.7);
+  z-index: 500;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+#hint-toast.visible { transform: translateY(0); opacity: 1; }
+.hint-toast-head {
+  font-size: 0.75em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin-bottom: 6px;
+}
+.hint-toast-body { font-size: 0.95em; color: var(--ink); line-height: 1.5; }
+.hint-toast-close {
+  position: absolute;
+  top: 8px; right: 10px;
+  background: none;
+  border: none;
+  color: var(--gold-dim);
+  font-size: 1.1em;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ============ UTILITY ============ */
+.hidden { display: none !important; }
+.ornament-divider {
+  text-align: center;
+  color: var(--gold-dim);
+  font-size: 0.8em;
+  letter-spacing: 12px;
+  margin: 16px 0;
+}
+
+/* ============ OTZAR (INVENTORY) ============ */
+#otzar-panel .sidebar-panel-title { cursor: pointer; user-select: none; }
+#otzar-panel .sidebar-panel-title::after { content: ' ▾'; font-size: 0.8em; }
+.otzar-shelf { display: flex; flex-wrap: wrap; gap: 6px; min-height: 30px; }
+.sefer-item {
+  position: relative;
+  font-size: 1.4em;
+  cursor: pointer;
+  transition: transform 0.2s ease, filter 0.2s ease;
+  filter: drop-shadow(0 0 4px rgba(120,180,255,0.3));
+}
+.sefer-item:hover { transform: scale(1.3) translateY(-4px); }
+.sefer-item.new-item { animation: sefer-arrive 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes sefer-arrive {
+  from { transform: scale(0) rotate(-20deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0deg);   opacity: 1; }
+}
+.sefer-tooltip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--parchment-light);
+  border: 1px solid var(--gold);
+  border-radius: 5px;
+  padding: 8px 10px;
+  width: 190px;
+  font-size: 0.38em;
+  font-family: 'IM Fell English', serif;
+  color: var(--ink);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 200;
+  box-shadow: 0 4px 16px rgba(0,10,60,0.7);
+  line-height: 1.4;
+}
+.sefer-item:hover .sefer-tooltip { opacity: 1; }
+.sefer-tooltip strong { color: var(--gold-bright); display: block; margin-bottom: 4px; font-size: 1.1em; }
+.sefer-tooltip em { color: var(--gold); }
+.otzar-empty {
+  font-size: 0.78em;
+  color: var(--ink-faint);
+  font-style: italic;
+  text-align: center;
+  padding: 6px 0;
+}
+
+/* Item earn toast */
+#item-earn-toast {
+  position: fixed;
+  top: 80px;
+  left: -360px;
+  width: 340px;
+  background: var(--parchment-light);
+  border: 1px solid var(--gold-bright);
+  border-radius: 8px;
+  padding: 14px 18px;
+  z-index: 600;
+  box-shadow: 0 8px 32px rgba(0,10,60,0.8);
+  transition: left 0.5s cubic-bezier(0.34,1.3,0.64,1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+#item-earn-toast.visible { left: 20px; }
+.item-earn-emoji { font-size: 2.4em; flex-shrink: 0; }
+.item-earn-text strong { color: var(--gold-bright); display: block; font-size: 1em; margin-bottom: 3px; }
+.item-earn-text span { font-size: 0.8em; color: var(--ink-faint); line-height: 1.4; }
+
+/* ============ BOSS FARHER MODAL ============ */
+#farher-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,20,0.9);
+  z-index: 800;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#farher-modal.active { display: flex; }
+.farher-card {
+  background: var(--parchment-mid);
+  border: 2px solid var(--gold-bright);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px 32px;
+  box-shadow: 0 0 60px rgba(100,150,255,0.3);
+  position: relative;
+}
+.farher-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid rgba(100,150,255,0.2);
+  padding-bottom: 14px;
+}
+.farher-avatar { font-size: 3em; }
+.farher-header-text h2 {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 1em;
+  color: var(--gold-bright);
+  margin-bottom: 3px;
+}
+.farher-header-text p { font-size: 0.85em; color: var(--ink-faint); line-height: 1.4; }
+.timer-ring-wrap {
+  margin: 0 auto 16px;
+  width: 90px; height: 90px;
+  position: relative;
+}
+.timer-ring-wrap svg { transform: rotate(-90deg); }
+#farher-timer-ring {
+  stroke-dasharray: 251.2;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear, stroke 0.3s ease;
+}
+.timer-number {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Courier Prime', monospace;
+  font-size: 1.6em;
+  font-weight: bold;
+  color: var(--gold-bright);
+}
+.timer-number.danger { color: var(--wrong); animation: shake-num 0.3s ease infinite alternate; }
+@keyframes shake-num { from { transform: translateX(-2px); } to { transform: translateX(2px); } }
+.farher-q-progress { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+.farher-q-dot {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--gold-dim);
+  background: rgba(0,5,30,0.4);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7em;
+  color: var(--gold-dim);
+  transition: all 0.3s ease;
+}
+.farher-q-dot.active { border-color: var(--gold-bright); color: var(--gold-bright); box-shadow: 0 0 8px rgba(120,180,255,0.4); }
+.farher-q-dot.passed { background: var(--correct); border-color: var(--correct); color: #001a00; }
+.farher-q-dot.failed { background: var(--wrong); border-color: var(--wrong); color: white; }
+.farher-question-box {
+  background: rgba(0,5,30,0.3);
+  border: 1px solid rgba(100,150,255,0.15);
+  border-radius: 6px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.farher-question-box .schema-display { margin-bottom: 8px; font-size: 0.78em; }
+.farher-task { font-size: 0.9em; color: var(--ink-faint); line-height: 1.5; margin-bottom: 10px; }
+.farher-task em { color: var(--gold); }
+.farher-task strong { color: var(--ink); }
+.farher-input-row { display: flex; gap: 8px; align-items: flex-start; }
+#farher-query-input {
+  flex: 1;
+  background: var(--terminal-bg);
+  color: var(--terminal-text);
+  border: 1px solid var(--gold-dim);
+  padding: 8px 10px;
+  font-family: 'Courier Prime', monospace;
+  font-size: 0.85em;
+  border-radius: 4px;
+  resize: none;
+  height: 60px;
+  caret-color: var(--gold-bright);
+}
+#farher-query-input:focus { outline: none; border-color: var(--gold); }
+.farher-result-msg { margin-top: 8px; font-size: 0.9em; min-height: 20px; font-style: italic; }
+.farher-result-msg.ok { color: var(--correct); }
+.farher-result-msg.bad { color: var(--wrong); }
+.farher-outcome { text-align: center; padding: 20px 0; display: none; }
+.farher-outcome.active { display: block; }
+.farher-outcome h3 { font-family: 'Cinzel Decorative', serif; font-size: 1.3em; margin-bottom: 12px; }
+.farher-outcome.pass h3 { color: var(--correct); }
+.farher-outcome.fail h3 { color: var(--wrong); }
+.farher-outcome p { font-size: 0.95em; color: var(--ink-faint); line-height: 1.6; margin-bottom: 16px; }
+
+/* ============ MAP MODAL ============ */
+.map-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,20,0.9);
+  z-index: 2500;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.map-modal-overlay.active { display: flex; }
+.map-card {
+  background: var(--parchment-mid);
+  border: 2px solid var(--gold-dim);
+  border-radius: 8px;
+  padding: 40px;
+  text-align: center;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 8px 32px rgba(0,10,60,0.9);
+  position: relative;
+  animation: sefer-arrive 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+.map-card h2 { color: var(--gold-bright); font-family: 'Cinzel Decorative', serif; margin-bottom: 8px; }
+.map-subtitle { color: var(--ink-faint); margin-bottom: 24px; font-style: italic; }
+.yeshiva-list { display: flex; flex-direction: column; gap: 16px; }
+.map-btn {
+  padding: 16px 20px;
+  font-size: 1.05em;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.map-btn strong { color: #d8e8ff; font-family: 'Cinzel Decorative', serif; font-size: 0.9em; }
+.map-close {
+  position: absolute;
+  top: 15px; right: 15px;
+  background: none;
+  border: none;
+  color: var(--gold-dim);
+  font-size: 1.2em;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.map-close:hover { color: var(--gold-bright); }
+
+/* ============ MASHGIACH POPUP ============ */
+#mashgiach-popup {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  width: min(500px, 90vw);
+  background: var(--parchment-mid);
+  border: 1px solid var(--gold-dim);
+  border-radius: 10px;
+  padding: 16px 20px;
+  z-index: 550;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  box-shadow: 0 8px 40px rgba(0,10,60,0.6);
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+#mashgiach-popup.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+.mashgiach-face { font-size: 2.4em; flex-shrink: 0; animation: wobble-face 1.5s ease-in-out infinite; }
+@keyframes wobble-face {
+  0%,100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
+}
+.mashgiach-bubble { flex: 1; }
+.mashgiach-bubble .m-label { font-size: 0.7em; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-dim); margin-bottom: 5px; }
+.mashgiach-bubble .m-text { font-size: 0.9em; color: var(--ink); line-height: 1.55; }
+.mashgiach-bubble .m-text em { color: var(--gold); }
+.mashgiach-bubble .m-text code {
+  font-family: 'Courier Prime', monospace;
+  background: rgba(0,0,0,0.4);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--sql-string);
+  font-size: 0.9em;
+}
+.mashgiach-close {
+  position: absolute;
+  top: 8px; right: 10px;
+  background: none;
+  border: none;
+  color: var(--gold-dim);
+  font-size: 1em;
+  cursor: pointer;
+}
+
+/* ============ ECHAD TRIVIA ============ */
+.echad-trivia-area { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; }
+.echad-category-badge {
+  font-size: 0.7em;
+  background: rgba(100,150,255,0.1);
+  border: 1px solid var(--gold-dim);
+  border-radius: 10px;
+  padding: 1px 7px;
+  color: var(--gold-dim);
+  flex-shrink: 0;
+}
+
+/* Boss warning flash */
+.boss-incoming-flash {
+  position: fixed;
+  inset: 0;
+  border: 4px solid var(--gold-bright);
+  pointer-events: none;
+  z-index: 790;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  box-shadow: inset 0 0 60px rgba(120,180,255,0.2);
+}
+.boss-incoming-flash.active { opacity: 1; }
+
+/* ============ LEVEL GATE ============ */
+#level-gate {
+  position: fixed;
+  inset: 0;
+  background: var(--parchment-dark);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  transition: opacity 0.8s ease, visibility 0.8s ease;
+  background-image:
+    radial-gradient(ellipse at 20% 50%, rgba(20,40,120,0.3) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(10,20,80,0.4) 0%, transparent 50%);
+}
+#level-gate.unlocked { opacity: 0; visibility: hidden; }
+.gate-card {
+  background: var(--parchment-mid);
+  border: 2px solid var(--gold-dim);
+  border-radius: 8px;
+  padding: 40px;
+  text-align: center;
+  max-width: 440px;
+  box-shadow: 0 8px 48px rgba(0,10,60,0.9);
+}
+.gate-card h2 { color: var(--gold-bright); font-family: 'Cinzel Decorative', serif; margin-bottom: 8px; font-size: 1.1em; }
+.gate-subtitle { color: var(--ink-faint); font-style: italic; margin-bottom: 20px; font-size: 0.9em; line-height: 1.5; }
+/* Decorative "II" badge on gate */
+.gate-level-mark {
+  font-family: 'Cinzel Decorative', serif;
+  font-size: 3em;
+  color: var(--gold-dim);
+  display: block;
+  margin: 0 auto 16px;
+  text-shadow: 0 0 30px rgba(120,180,255,0.3);
+  letter-spacing: 0.2em;
+}
+.gate-input {
+  background: var(--terminal-bg);
+  border: 1px solid var(--gold);
+  color: var(--gold-bright);
+  font-family: 'Courier Prime', monospace;
+  font-size: 1.5em;
+  text-align: center;
+  padding: 10px;
+  width: 100%;
+  margin-bottom: 15px;
+  letter-spacing: 4px;
+  border-radius: 4px;
+}
+.gate-input:focus { outline: none; box-shadow: 0 0 16px rgba(120,180,255,0.4); }
+.gate-error { color: var(--wrong); font-size: 0.9em; min-height: 40px; margin-top: 15px; font-style: italic; line-height: 1.4; }
+.shake { animation: gate-shake 0.4s ease-in-out; }
+@keyframes gate-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+.gate-hint-text { font-size: 0.78em; color: var(--ink-faint); margin-top: 12px; font-style: italic; }
+
+/* SVG Archive illustration styles */
+#archive-svg { transition: filter 0.3s ease; border-radius: 4px; }
+#archive-svg:hover {
+  filter: drop-shadow(0 0 10px rgba(120,180,255,0.6));
+  transform: scale(1.05);
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+@media (max-width: 700px) {
+  #app-shell { grid-template-columns: 1fr; grid-template-rows: 50px auto 1fr; }
+  #sidebar { grid-column: 1; grid-row: 2; flex-direction: row; overflow-x: auto; padding: 10px; gap: 10px; max-height: 100px; }
+  #main-area { grid-column: 1; grid-row: 3; }
+  .sidebar-panel { min-width: 140px; }
+  #avatar-display, .chazal-box { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ======== LEVEL GATE ======== -->
+<div id="level-gate">
+  <div class="gate-card" id="gate-card">
+    <span class="gate-level-mark">II</span>
+    <h2>The Sage's Archives</h2>
+    <p class="gate-subtitle">You seek the Chamber of Joins and Aggregates.<br>Enter the Secret Passage Code from Level I to proceed.</p>
+    <input type="text" id="gate-code-input" class="gate-input" maxlength="4" placeholder="_ _ _ _" autocomplete="off">
+    <button class="btn btn-primary" style="margin-top: 0; width: 100%;" onclick="validateGate()">Unlock the Second Chamber</button>
+    <div id="gate-error-msg" class="gate-error"></div>
+    <p class="gate-hint-text">💡 The code is revealed upon completing Level I</p>
+  </div>
+</div>
+
+<!-- ======== BOSS INCOMING FLASH ======== -->
+<div class="boss-incoming-flash" id="boss-flash"></div>
+
+<!-- ======== ITEM EARN TOAST ======== -->
+<div id="item-earn-toast">
+  <div class="item-earn-emoji" id="item-earn-emoji">📖</div>
+  <div class="item-earn-text">
+    <strong id="item-earn-name">Ketzos HaChoshen</strong>
+    <span id="item-earn-desc">Added to your Otzar!</span>
+  </div>
+</div>
+
+<!-- ======== MAP MODAL ======== -->
+<div id="map-modal" class="map-modal-overlay">
+  <div class="map-card">
+    <button class="map-close" onclick="closeMapModal()">✕</button>
+    <h2>Select Yeshiva</h2>
+    <p class="map-subtitle">Where will your learning take you?</p>
+    <div class="yeshiva-list">
+      <button class="btn btn-hint map-btn" onclick="window.location.href='SQL_game_YESHIVA_NUMBER_1.html'">
+        <strong>📜 Yeshiva I — The Beis Medrash</strong>
+        <span style="font-size:0.8em;color:var(--ink-faint)">SQL Basics: SELECT, WHERE, ORDER BY</span>
+      </button>
+      <button class="btn btn-primary map-btn" onclick="closeMapModal()">
+        <strong>📚 Yeshiva II — The Archives (Current)</strong>
+        <span style="font-size:0.8em;color:#b0d0ff">JOINs, GROUP BY, HAVING, Aggregates</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== MASHGIACH POPUP ======== -->
+<div id="mashgiach-popup">
+  <button class="mashgiach-close" onclick="closeMashgiach()">✕</button>
+  <div class="mashgiach-face">📜</div>
+  <div class="mashgiach-bubble">
+    <div class="m-label">📢 Rav Yochanan — Archivist Sage</div>
+    <div class="m-text" id="mashgiach-text">Nu, bochur...</div>
+  </div>
+</div>
+
+<!-- ======== FARHER MODAL ======== -->
+<div id="farher-modal">
+  <div class="farher-card">
+    <div class="farher-header">
+      <div class="farher-avatar">🏛️</div>
+      <div class="farher-header-text">
+        <h2 id="farher-title">Rav Yochanan's Mid-Seder Farher</h2>
+        <p id="farher-subtitle">The Sage tests your SQL mastery. Answer all queries in 90 seconds!</p>
+      </div>
+    </div>
+    <div class="timer-ring-wrap">
+      <svg width="90" height="90" viewBox="0 0 90 90">
+        <circle cx="45" cy="45" r="40" fill="none" stroke="rgba(100,150,255,0.15)" stroke-width="6"/>
+        <circle cx="45" cy="45" r="40" fill="none" stroke="#7aaeff" stroke-width="6"
+          id="farher-timer-ring" stroke-linecap="round"/>
+      </svg>
+      <div class="timer-number" id="farher-timer-num">90</div>
+    </div>
+    <div class="farher-q-progress" id="farher-q-dots"></div>
+    <div class="farher-question-box" id="farher-question-box">
+      <div class="schema-display" id="farher-schema"></div>
+      <div class="farher-task" id="farher-task"></div>
+      <div class="farher-input-row">
+        <textarea id="farher-query-input" placeholder="-- Write your query..."></textarea>
+        <button class="btn btn-primary" style="height:60px;padding:0 14px;font-size:0.85em;" onclick="submitFarherQuery()">▶ Run</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+        <button id="farher-hint-btn" class="btn btn-hint" style="font-size:0.8em;padding:5px 12px;display:none;" onclick="useFarherHint()">💡 Hint (−15s)</button>
+        <div id="farher-hint-box" style="display:none;font-size:0.85em;color:var(--gold);font-style:italic;flex:1;line-height:1.4;"></div>
+      </div>
+      <div class="farher-result-msg" id="farher-result-msg"></div>
+    </div>
+    <div class="farher-outcome" id="farher-outcome">
+      <h3 id="farher-outcome-title">Yashar Koach!</h3>
+      <p id="farher-outcome-text"></p>
+      <button class="btn btn-primary" id="farher-outcome-btn" onclick="closeFarher()">Continue Learning ➡</button>
+      <button class="btn btn-hint" id="farher-continue-anyway-btn" style="display:none;margin-top:8px;" onclick="closeFarher()">Continue Anyway (no bonus XP) ➡</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== CHAPTER TRANSITION OVERLAY ======== -->
+<div id="chapter-overlay">
+  <div class="chapter-flash-text" id="chapter-flash-label">Perek 2</div>
+</div>
+
+<!-- ======== CONFETTI CANVAS ======== -->
+<canvas id="confetti-canvas"></canvas>
+
+<!-- ======== HINT TOAST ======== -->
+<div id="hint-toast">
+  <button class="hint-toast-close" onclick="closeHintToast()">✕</button>
+  <div class="hint-toast-head">💡 Hint <span id="hint-num">1</span> of 3</div>
+  <div class="hint-toast-body" id="hint-body"></div>
+</div>
+
+<!-- ======== APP SHELL ======== -->
+<div id="app-shell">
+
+  <!-- HEADER -->
+  <header id="header-bar">
+    <div class="header-logo">
+      <!-- Level 2 Archive SVG — replaces the Beis Medrash SVG -->
+      <svg id="archive-svg" width="72" height="52" viewBox="0 0 180 130" xmlns="http://www.w3.org/2000/svg"
+           title="The Sage's Archives" style="cursor:pointer;flex-shrink:0;" onclick="toggleSoundscape()">
+        <defs>
+          <filter id="arc-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <linearGradient id="arc-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#030820"/>
+            <stop offset="100%" stop-color="#06091a"/>
+          </linearGradient>
+          <radialGradient id="scroll-glow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#aad0ff" stop-opacity="1"/>
+            <stop offset="100%" stop-color="#3060c0" stop-opacity="0.2"/>
+          </radialGradient>
+        </defs>
+        <!-- Sky -->
+        <rect width="180" height="130" fill="url(#arc-sky)"/>
+        <!-- Stars -->
+        <circle cx="12" cy="8" r="0.9" fill="white" opacity="0.7"/>
+        <circle cx="30" cy="5" r="0.6" fill="white" opacity="0.5"/>
+        <circle cx="150" cy="7" r="0.9" fill="white" opacity="0.8"/>
+        <circle cx="165" cy="12" r="0.6" fill="white" opacity="0.4"/>
+        <circle cx="142" cy="4" r="0.7" fill="white" opacity="0.6"/>
+        <circle cx="65" cy="6" r="0.5" fill="white" opacity="0.5"/>
+        <circle cx="100" cy="3" r="0.4" fill="white" opacity="0.6"/>
+        <!-- Ground -->
+        <rect x="0" y="115" width="180" height="15" fill="#02040f"/>
+        <!-- Archive building — stone colonnade -->
+        <rect x="10" y="60" width="160" height="57" fill="#0d1530" stroke="#3a5a9a" stroke-width="1.5"/>
+        <!-- Roof/pediment -->
+        <polygon points="5,60 90,20 175,60" fill="#060c20" stroke="#7aaeff" stroke-width="2"/>
+        <!-- Roof ornament -->
+        <polygon points="83,24 90,12 97,24" fill="#7aaeff" opacity="0.8"/>
+        <!-- Columns -->
+        <rect x="22" y="60" width="6" height="57" fill="#182048"/>
+        <rect x="40" y="60" width="6" height="57" fill="#182048"/>
+        <rect x="132" y="60" width="6" height="57" fill="#182048"/>
+        <rect x="150" y="60" width="6" height="57" fill="#182048"/>
+        <!-- Scrolls on shelves — the "windows" of this building are scroll-slots -->
+        <!-- Shelf 1 -->
+        <rect x="20" y="72" width="50" height="4" fill="#3a5a9a" opacity="0.5"/>
+        <rect x="22" y="66" width="6" height="7" rx="3" fill="#7aaeff" opacity="0" id="arcw-0" filter="url(#arc-glow)"/>
+        <rect x="30" y="66" width="6" height="7" rx="3" fill="#7aaeff" opacity="0" id="arcw-1" filter="url(#arc-glow)"/>
+        <rect x="38" y="66" width="6" height="7" rx="3" fill="#7aaeff" opacity="0" id="arcw-2" filter="url(#arc-glow)"/>
+        <!-- Shelf 2 -->
+        <rect x="20" y="85" width="50" height="4" fill="#3a5a9a" opacity="0.5"/>
+        <rect x="22" y="79" width="6" height="7" rx="3" fill="#7aaeff" opacity="0" id="arcw-3" filter="url(#arc-glow)"/>
+        <rect x="30" y="79" width="6" height="7" rx="3" fill="#7aaeff" opacity="0" id="arcw-4" filter="url(#arc-glow)"/>
+        <rect x="38" y="79" width="6" height="7" rx="3" fill="#7aaeff" opacity="0" id="arcw-5" filter="url(#arc-glow)"/>
+        <!-- Right shelves -->
+        <rect x="110" y="72" width="50" height="4" fill="#3a5a9a" opacity="0.5"/>
+        <rect x="110" y="85" width="50" height="4" fill="#3a5a9a" opacity="0.5"/>
+        <!-- Door -->
+        <rect x="77" y="88" width="26" height="29" rx="13" fill="#02040f" stroke="#7aaeff" stroke-width="1.5"/>
+        <line x1="90" y1="88" x2="90" y2="117" stroke="#7aaeff" stroke-width="0.8" opacity="0.5"/>
+        <!-- Menorah lamp on roof ridge -->
+        <line x1="90" y1="14" x2="90" y2="22" stroke="#7aaeff" stroke-width="1.5"/>
+        <circle id="arc-flame" cx="90" cy="13" r="3.5" fill="#aad0ff" filter="url(#arc-glow)" opacity="0.9"/>
+        <!-- Label -->
+        <text x="90" y="128" font-family="Georgia,serif" font-size="5.5" fill="#3a5a9a" text-anchor="middle">גְּנִיזַת הַחָכְמָה</text>
+      </svg>
+      <div>
+        <h1>Lost in the Beis Medrash <span>SQL Seder • Level II — The Archives</span></h1>
+      </div>
+      <span class="level-badge">LVL II</span>
+    </div>
+    <div id="header-status"></div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+
+    <!-- Avatar Panel -->
+    <div class="sidebar-panel" id="avatar-panel">
+      <div class="sidebar-panel-title">Your Character</div>
+      <div id="avatar-display">
+        <!-- Simplified SVG Avatar for Level 2 — Rav Yochanan inspired -->
+        <svg id="rosh-chabura-svg" width="72" height="80" viewBox="0 0 100 112" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto 8px;">
+          <defs>
+            <radialGradient id="face-grad2" cx="50%" cy="40%" r="55%">
+              <stop offset="0%" stop-color="#d8eaff"/>
+              <stop offset="100%" stop-color="#8aacdc"/>
+            </radialGradient>
+            <filter id="avatar-glow2">
+              <feGaussianBlur stdDeviation="2" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <!-- Turban/hat — sapphire-blue for Level 2 -->
+          <ellipse cx="50" cy="24" rx="28" ry="6" fill="#0d1a4a"/>
+          <rect x="24" y="10" width="52" height="16" rx="8" fill="#0d1a4a"/>
+          <ellipse cx="50" cy="10" rx="20" ry="4" fill="#0d1a4a"/>
+          <!-- Hat band — silver/gold -->
+          <rect x="24" y="22" width="52" height="3" rx="1" fill="#5080c0"/>
+          <!-- Face -->
+          <ellipse cx="50" cy="52" rx="24" ry="26" fill="url(#face-grad2)"/>
+          <!-- Beard — white/silver -->
+          <ellipse cx="50" cy="72" rx="20" ry="14" fill="#c8d8f0"/>
+          <!-- Ears -->
+          <ellipse cx="26" cy="52" rx="4" ry="5" fill="#a0b8d8"/>
+          <ellipse cx="74" cy="52" rx="4" ry="5" fill="#a0b8d8"/>
+          <!-- Neutral eyes -->
+          <g id="av-eyes-neutral">
+            <ellipse cx="40" cy="47" rx="4" ry="4.5" fill="#0a1830"/>
+            <ellipse cx="60" cy="47" rx="4" ry="4.5" fill="#0a1830"/>
+            <circle cx="41.5" cy="45.5" r="1.2" fill="white" opacity="0.7"/>
+            <circle cx="61.5" cy="45.5" r="1.2" fill="white" opacity="0.7"/>
+          </g>
+          <!-- Happy eyes -->
+          <g id="av-eyes-happy" visibility="hidden">
+            <path d="M36,47 Q40,43 44,47" stroke="#0a1830" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <path d="M56,47 Q60,43 64,47" stroke="#0a1830" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          </g>
+          <!-- Sad eyes -->
+          <g id="av-eyes-sad" visibility="hidden">
+            <path d="M36,45 Q40,49 44,45" stroke="#0a1830" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <path d="M56,45 Q60,49 64,45" stroke="#0a1830" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <ellipse cx="37" cy="51" rx="1.5" ry="2.5" fill="#6ab4e8" opacity="0.7"/>
+          </g>
+          <!-- Thinking eyes -->
+          <g id="av-eyes-thinking" visibility="hidden">
+            <ellipse cx="40" cy="47" rx="4" ry="4.5" fill="#0a1830"/>
+            <ellipse cx="60" cy="47" rx="4" ry="4.5" fill="#0a1830"/>
+            <circle cx="41.5" cy="45.5" r="1.2" fill="white" opacity="0.7"/>
+            <circle cx="61.5" cy="45.5" r="1.2" fill="white" opacity="0.7"/>
+            <path d="M35,41 Q40,38 45,40" stroke="#2a4a80" stroke-width="1.8" fill="none"/>
+            <path d="M55,40 Q60,38 65,41" stroke="#2a4a80" stroke-width="1.8" fill="none"/>
+          </g>
+          <!-- Mouths -->
+          <path id="av-mouth-neutral" d="M42,63 Q50,67 58,63" stroke="#3050a0" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path id="av-mouth-happy" d="M40,62 Q50,72 60,62" stroke="#3050a0" stroke-width="2.5" fill="none" stroke-linecap="round" visibility="hidden"/>
+          <path id="av-mouth-sad" d="M42,67 Q50,62 58,67" stroke="#3050a0" stroke-width="2.5" fill="none" stroke-linecap="round" visibility="hidden"/>
+          <path id="av-mouth-thinking" d="M44,64 Q52,66 58,63" stroke="#3050a0" stroke-width="2" fill="none" stroke-linecap="round" visibility="hidden"/>
+          <!-- Nose -->
+          <path d="M48,55 Q50,60 52,55" stroke="#6080b0" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <!-- Glasses — always shown for the Sage -->
+          <g id="av-glasses">
+            <circle cx="40" cy="47" r="8" fill="none" stroke="#0a1830" stroke-width="1.5"/>
+            <circle cx="60" cy="47" r="8" fill="none" stroke="#0a1830" stroke-width="1.5"/>
+            <line x1="48" y1="47" x2="52" y2="47" stroke="#0a1830" stroke-width="1.5"/>
+            <line x1="26" y1="47" x2="32" y2="47" stroke="#0a1830" stroke-width="1.5"/>
+            <line x1="68" y1="47" x2="74" y2="47" stroke="#0a1830" stroke-width="1.5"/>
+          </g>
+          <!-- Scroll under arm -->
+          <rect x="68" y="88" width="28" height="7" rx="2" fill="#1a3a8b" stroke="#7aaeff" stroke-width="1"/>
+          <rect x="70" y="82" width="24" height="7" rx="2" fill="#0d1530" stroke="#7aaeff" stroke-width="1"/>
+          <!-- Body — deep blue robe -->
+          <rect x="26" y="80" width="48" height="32" rx="8" fill="#060c20"/>
+          <!-- Belt -->
+          <rect x="26" y="96" width="48" height="3" fill="#0d1a40"/>
+          <!-- XP Aura -->
+          <ellipse id="av-aura" cx="50" cy="50" rx="30" ry="32" fill="none" stroke="#aad0ff" stroke-width="2" opacity="0" filter="url(#avatar-glow2)"/>
+        </svg>
+        <div id="avatar-name">Reb Chaim</div>
+        <div id="avatar-title">Masmid B'Torah</div>
+        <div id="avatar-mood" style="font-size:0.7em;color:var(--gold-dim);font-style:italic;margin-top:3px;">Ready to pasken...</div>
+      </div>
+    </div>
+
+    <!-- Madreiga / XP -->
+    <div class="sidebar-panel" id="xp-panel">
+      <div class="sidebar-panel-title">Madreiga (Level)</div>
+      <div class="xp-label">
+        <span>Shteig Points</span>
+        <span id="xp-value">0 XP</span>
+      </div>
+      <div class="xp-bar-track">
+        <div class="xp-bar-fill" id="xp-bar" style="width:0%"></div>
+      </div>
+      <div id="madreiga-label">Bein Hazmanim (Beginner)</div>
+    </div>
+
+    <!-- Zman Progress -->
+    <div class="sidebar-panel" id="zman-panel">
+      <div class="sidebar-panel-title">Zman Progress</div>
+      <div class="zman-perek-dots" id="perek-dots"></div>
+    </div>
+
+    <!-- Otzar (Inventory) -->
+    <div class="sidebar-panel" id="otzar-panel">
+      <div class="sidebar-panel-title" onclick="toggleOtzar()">הָאוֹצָר — Otzar</div>
+      <div class="otzar-shelf" id="otzar-shelf">
+        <div class="otzar-empty" id="otzar-empty">No scrolls yet.<br><em style="font-size:0.9em">Earn them by shteiging!</em></div>
+      </div>
+    </div>
+
+    <!-- Chazal Quote -->
+    <div class="sidebar-panel" id="chazal-panel" style="margin-top: auto;">
+      <div class="sidebar-panel-title">Chazal</div>
+      <div class="chazal-box" id="chazal-quote">Kol haschalos kashos — all beginnings are difficult.</div>
+    </div>
+
+  </aside>
+
+  <!-- MAIN AREA -->
+  <main id="main-area">
+
+    <!-- ===== CHARACTER PICKER SCREEN ===== -->
+    <div class="screen active" id="screen-picker">
+      <div class="picker-card">
+        <h2>Choose Your Scholar</h2>
+        <div class="avatar-grid">
+          <div class="avatar-btn selected" data-emoji="📜" data-label="The Archivist" onclick="pickAvatar(this)">📜</div>
+          <div class="avatar-btn" data-emoji="🔍" data-label="The Lamdan" onclick="pickAvatar(this)">🔍</div>
+          <div class="avatar-btn" data-emoji="🏛️" data-label="The Sage" onclick="pickAvatar(this)">🏛️</div>
+        </div>
+        <div class="name-input-wrap">
+          <label for="name-input">Your Name</label>
+          <input id="name-input" type="text" placeholder="Reb Chaim" value="Reb Chaim" maxlength="24">
+        </div>
+        <div class="ornament-divider">✦ ✦ ✦</div>
+        <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+          <button class="btn btn-start" onclick="showBackstory()">Enter the Archives</button>
+          <button class="btn btn-hint" style="margin-top: 20px; font-size: 1.1em; padding: 12px 28px;" onclick="openMapModal()">🗺️ Explore Map</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== BACKSTORY SCREEN ===== -->
+    <div class="screen" id="screen-backstory">
+      <div class="backstory-card">
+        <h2>The Archives of Rav Yochanan</h2>
+        <div class="ornament-divider" style="margin:0 0 16px;">✦</div>
+        <p>
+          Baruch Hashem, the bochurim of the Beis Medrash have been returned to their proper seats. The first Seder is restored.<br><br>
+          But word has reached you of a graver matter. Deep beneath the Beis Medrash lies the <em>Genizat HaChachmah</em> — the legendary <strong>Archives of the Sages</strong>. Here, the great Rav Yochanan HaSandlar catalogued the works of every Torah author across every era into a meticulous relational database: the <em>Authors</em> table and the <em>Scrolls</em> table, linked by a sacred <strong>author_id</strong>.<br><br>
+          But the two tables have become disconnected! Without JOIN queries to unite them, no one can tell which sage wrote which scroll. The bochurim cannot find the right sefer for their learning. The Shas is unshelved!<br><br>
+          Rav Yochanan approaches. <em>"A lamdan must see the connections between things,"</em> he says. <em>"Just as every sugya connects to another through a shared svara, every table connects through a shared key. Master the JOIN, the GROUP BY, the HAVING — and you will restore the Archives."</em><br><br>
+          Are you ready to unite the scrolls with their authors?
+        </p>
+        <div style="text-align:center;">
+          <button class="btn btn-enter" onclick="startGame()">I am ready. Let's learn JOINs!</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== GAME SCREEN ===== -->
+    <div class="screen" id="screen-game">
+      <div class="game-inner">
+        <div id="narrative-box"></div>
+        <div id="task-panel">
+          <div id="task-title-display"></div>
+          <div class="schema-display" id="schema-display"></div>
+          <div id="task-desc-display"></div>
+        </div>
+        <div id="terminal-panel">
+          <div class="terminal-titlebar">
+            <div class="terminal-dot dot-red"></div>
+            <div class="terminal-dot dot-yellow"></div>
+            <div class="terminal-dot dot-green"></div>
+            <span class="terminal-label">archives_db.sql — Level II Query Editor</span>
+          </div>
+          <div class="terminal-body">
+            <div class="line-numbers" id="line-numbers">1</div>
+            <div class="editor-wrapper">
+              <div id="highlight-overlay"></div>
+              <textarea
+                id="query-input"
+                placeholder="-- Type your SQL shaila here..."
+                spellcheck="false"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+              ></textarea>
+            </div>
+          </div>
+          <div id="control-bar">
+            <button class="btn btn-primary" onclick="runQuery()">▶ PASKAN QUERY</button>
+            <button class="btn btn-hint" onclick="showHint()">💡 Hint</button>
+            <button id="next-btn" class="btn btn-next" onclick="nextChapter()">Next Perek ➡</button>
+          </div>
+        </div>
+        <div id="result-area">
+          <div class="result-inner" id="result-inner"></div>
+        </div>
+        <div id="hint-reveal-bar">
+          <div class="echad-trivia-area">
+            <span>Stuck? Torah trivia:</span>
+            <span class="echad-category-badge" id="echad-category">Counting</span>
+            <strong id="echad-question">What number is...</strong>
+          </div>
+          <input type="text" id="echad-input" placeholder="#" maxlength="4" inputmode="numeric">
+          <button class="btn-reveal" onclick="revealAnswer()">Reveal</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== SIYUM SCREEN ===== -->
+    <div class="screen" id="screen-siyum">
+      <div class="siyum-card">
+        <h1>🎉 MAZEL TOV! SIYUM LEVEL II! 🎉</h1>
+        <svg width="90" height="90" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="margin:20px auto;display:block;">
+          <rect x="10" y="10" width="80" height="80" fill="none" stroke="#7aaeff" stroke-width="5" rx="4"/>
+          <rect x="20" y="20" width="60" height="60" fill="#0d1530"/>
+          <text x="50" y="58" font-family="Georgia" font-size="28" fill="#7aaeff" text-anchor="middle" font-weight="bold">סיום</text>
+        </svg>
+        <p>
+          <em>Hadran Alach, Genizat HaChachmah!</em> You have mastered the art of the JOIN, tamed the GROUP BY, and wielded HAVING with precision. Rav Yochanan nods in approval — the Archives are restored, every scroll is linked to its rightful author, and the legacy of the Rishonim is secured.<br><br>
+          <strong>Ashreicha! You have ascended to a new level of SQL wisdom!</strong>
+        </p>
+        <div id="completion-code-container">
+          <p style="color:var(--ink-faint);font-size:0.9em;margin-bottom:10px;">This code unlocks Level III when it becomes available:</p>
+          <button id="reveal-code-btn" class="btn btn-hint" style="font-size: 1.1em; padding: 12px 24px;" onclick="revealSecretCode()">🗝️ Reveal Level III Code</button>
+          <div id="secret-code-wrap" class="code-reveal-area" style="display: none;">
+            <div id="secret-code-display">4817</div>
+            <button id="copy-code-btn" class="btn-copy" onclick="copySecretCode()">Copy</button>
+          </div>
+        </div>
+        <button class="btn btn-start" onclick="location.reload()">Start a New Zman (Play Again)</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ===================================================================
+// DATA & GAME STATE
+// ===================================================================
+let db, currentChapter = 1, captainName = "Reb Chaim", avatar = "📜";
+let hintIndex = 0, nextPerekDest = null;
+let xp = 0, chaptersCompleted = [];
+let typeWriterTimer = null;
+let wrongAttempts = 0;
+let inventory = [];
+let currentTrivia = null;
+let farherActive = false, farherQIndex = 0, farherPassed = [false,false,false];
+let farherTimerInterval = null, farherTimeLeft = 90;
+let farherPendingNext = null;
+let farherLastRoundKey = null;
+
+// ── Seforim inventory catalog (Level 2 themed — JOIN/Aggregate topics) ──
+const SEFORIM_CATALOG = [
+  {
+    id: 'rif',
+    emoji: '📗',
+    name: 'Rif on JOINs',
+    earnAt: 1,
+    hint: '<em>The Rif</em> teaches: <code>SELECT t1.col, t2.col FROM t1 JOIN t2 ON t1.id = t2.id</code> — the ON clause is the <em>shiduch</em> that links two tables by their shared key!'
+  },
+  {
+    id: 'rosh',
+    emoji: '📘',
+    name: 'Rosh on INNER JOIN',
+    earnAt: 3,
+    hint: 'The <em>Rosh</em>: INNER JOIN returns only rows that have a match in BOTH tables — like a chavrusa agreement that requires both sides to show up!'
+  },
+  {
+    id: 'tur',
+    emoji: '📙',
+    name: 'Tur on WHERE + JOIN',
+    earnAt: 5,
+    hint: '<em>The Tur</em>: After a JOIN, add <code>WHERE table.column = \'value\'</code> to filter. The WHERE clause applies AFTER the join is computed!'
+  },
+  {
+    id: 'beit_yosef',
+    emoji: '📕',
+    name: 'Beit Yosef on GROUP BY',
+    earnAt: 7,
+    hint: 'Beit Yosef on aggregates: <code>GROUP BY col</code> collapses many rows into groups. Use <code>COUNT(*)</code>, <code>SUM()</code>, <code>AVG()</code> to compute values per group!'
+  },
+  {
+    id: 'shulchan_aruch',
+    emoji: '📓',
+    name: 'Shulchan Aruch on HAVING',
+    earnAt: 9,
+    hint: 'The golden rule: <code>WHERE</code> filters ROWS (before grouping); <code>HAVING</code> filters GROUPS (after grouping). Use HAVING to say "only groups where COUNT > 1"!'
+  },
+  {
+    id: 'mapah',
+    emoji: '📔',
+    name: 'Mapah on LEFT JOIN',
+    earnAt: 11,
+    hint: 'The <em>Mapah</em>: <code>LEFT JOIN</code> includes ALL rows from the LEFT table, even if there\'s no match in the right — the unmatched right side shows NULL. No sage is forgotten!'
+  },
+  {
+    id: 'pri_chadash',
+    emoji: '📒',
+    name: 'Pri Chadash on ORDER BY',
+    earnAt: 13,
+    hint: '<em>Pri Chadash</em>: After your GROUP BY, add <code>ORDER BY COUNT(*) DESC</code> to rank from most to least. Add <code>LIMIT 1</code> to grab only the top result!'
+  },
+  {
+    id: 'chazon_ish',
+    emoji: '🗒️',
+    name: 'Chazon Ish on Complex Queries',
+    earnAt: 15,
+    hint: 'The <em>Chazon Ish</em>\'s full blueprint: <code>SELECT ... FROM t1 JOIN t2 ON ... WHERE ... GROUP BY ... HAVING ... ORDER BY ... LIMIT ...</code> — every clause in its proper order!'
+  }
+];
+
+// ── Dynamic Torah Trivia pool ──
+const TORAH_TRIVIA_POOL = [
+  { q: 'How many Imahos (Matriarchs) are there?',             a: 4,  cat: 'Avos & Imahos' },
+  { q: 'How many Avos (Patriarchs) are there?',               a: 3,  cat: 'Avos & Imahos' },
+  { q: 'How many Shevatim (Tribes) are there?',               a: 12, cat: 'Shevatim' },
+  { q: 'How many Dibros (Commandments) at Sinai?',            a: 10, cat: 'Matan Torah' },
+  { q: 'How many Sidrei Mishna are there?',                   a: 6,  cat: 'Mishna' },
+  { q: 'How many Masechtos are in Seder Moed?',               a: 12, cat: 'Mishna' },
+  { q: 'How many Masechtos are in Seder Nashim?',             a: 7,  cat: 'Mishna' },
+  { q: 'How many Luchos (tablets) did Moshe receive?',        a: 2,  cat: 'Matan Torah' },
+  { q: 'How many years did Bnei Yisrael wander?',             a: 40, cat: 'Midbar' },
+  { q: 'How many Middos of interpretation (R\' Yishmael)?',   a: 13, cat: 'Hermeneutics' },
+  { q: 'How many days of creation?',                          a: 6,  cat: 'Bereishis' },
+  { q: 'On which day did Shabbos fall in creation?',          a: 7,  cat: 'Bereishis' },
+  { q: 'How many Yamim Tovim are in the Torah?',              a: 5,  cat: 'Moadim' },
+  { q: 'How many days of Chanuka?',                           a: 8,  cat: 'Chanuka' },
+  { q: 'How many sons did Yaakov Avinu have?',                a: 12, cat: 'Shevatim' },
+  { q: 'How many sons did Noach have?',                       a: 3,  cat: 'Bereishis' },
+  { q: 'How many Parshiyos are in the Torah?',                a: 54, cat: 'Torah' },
+  { q: 'How many books (seforim) are in the Torah?',          a: 5,  cat: 'Torah' },
+  { q: 'How many books are in Tanach altogether?',            a: 24, cat: 'Torah' },
+  { q: 'How many Mitzvos Aseh (positive commandments)?',      a: 248,cat: 'Mitzvos' },
+  { q: 'Total number of Mitzvos in the Torah?',               a: 613,cat: 'Mitzvos' },
+  { q: 'How many days between Pesach and Shavuos?',           a: 49, cat: 'Moadim' },
+  { q: 'How many kings ruled a united Kingdom of Israel?',    a: 3,  cat: 'Melachim' },
+  { q: 'How many brothers sold Yosef?',                       a: 10, cat: 'Bereishis' },
+  { q: 'How many stars in Yosef\'s dream?',                   a: 11, cat: 'Bereishis' },
+  { q: 'How many months in a Hebrew leap year?',              a: 13, cat: 'Calendar' },
+  { q: 'How many months in a regular Hebrew year?',           a: 12, cat: 'Calendar' },
+  { q: 'Days in a standard week?',                            a: 7,  cat: 'Calendar' },
+  { q: 'How many books are in Seder Zeraim (Mishna)?',        a: 11, cat: 'Mishna' },
+  { q: 'How many candles total on the last night of Chanuka?',a: 9,  cat: 'Chanuka' },
+];
+
+const CHAZAL_QUOTES = [
+  "Kol haschalos kashos — all beginnings are difficult.",
+  "O chavrusa o misusa — fellowship or death.",
+  "Zrizim makdimim l'mitzvos — the zealous are early.",
+  "Michayil el chayil — from strength to strength.",
+  "Gadolah hachnasas orchim — great is hospitality.",
+  "Derech eretz kadma l'Torah.",
+  "Ein adam lomed Torah ela m'makom shelibo chafetz.",
+  "Talmud Torah k'neged kulam.",
+  "Lo hamidrash ikkar ela hamaaseh.",
+  "V'hagisa bo yomam v'layla — meditate on it day and night.",
+  "Kol hamachazik b'Torah — whoever holds fast to Torah.",
+  "B'makom sheain anashim — where there are no men, be a man.",
+];
+
+const MADREIGA_LEVELS = [
+  { min: 0,    label: "Masmid B'Torah (Beginner)" },
+  { min: 100,  label: "Ba'al JOIN" },
+  { min: 250,  label: "Lamdan B'Aggregates" },
+  { min: 450,  label: "Baki B'Sugyos" },
+  { min: 700,  label: "Gadol HaDor" },
+  { min: 1000, label: "Gaon HaArchives" }
+];
+
+const rightComplements = [
+  "Pashut geonus! The JOIN is masterful!",
+  "Mamash a baki b'SQL u'b'Shas!",
+  "Kileilei! The Sage is impressed.",
+  "Gevaldig! That query is a chiddush!",
+  "Emes l'amito! Rav Yochanan is schepping nachas.",
+  "A kup vi a beis medrash! Brilliant!",
+  "Yashrus! Clean, correct, kadosh."
+];
+
+const wrongInsults = [
+  "Oy vey, the JOIN is krum.",
+  "Am ha'aretz! Check your ON clause.",
+  "You're joining like a baal habos!",
+  "Gevald, what kind of GROUP BY is this?",
+  "Nu nu, don't batel your time, fix the aggregate!",
+  "That's farblunjet. Check your syntax.",
+  "Rav Yochanan is shaking his head. Almost!"
+];
+
+// ── Deep hints for each Perek ──
+const MASHGIACH_DEEP_HINTS = {
+  1:  { text: `Rav Yochanan: <em>"Use <code>SELECT * FROM Authors;</code> — an asterisk means 'all columns'. Simple!"</em>` },
+  2:  { text: `<em>"All scrolls means SELECT * FROM Scrolls;"</em> — just like Perek 1, but a different table!` },
+  3:  { text: `Rav Yochanan shows you: <code>SELECT Scrolls.title, Authors.name FROM Scrolls INNER JOIN Authors ON Scrolls.author_id = Authors.author_id;</code>` },
+  4:  { text: `<em>"After your JOIN, add: <code>WHERE Authors.era = 'Rishonim'</code>"</em> — exact spelling with capital R!` },
+  5:  { text: `<code>SELECT title, topic FROM Scrolls JOIN Authors ON Scrolls.author_id = Authors.author_id WHERE Authors.name = 'Rambam';</code>` },
+  6:  { text: `<em>"COUNT with an alias: <code>SELECT COUNT(*) AS Total_Scrolls FROM Scrolls;</code>"</em>` },
+  7:  { text: `<code>SELECT topic, COUNT(*) FROM Scrolls GROUP BY topic;</code> — one count per topic!` },
+  8:  { text: `<code>SELECT Authors.name, COUNT(Scrolls.scroll_id) FROM Authors JOIN Scrolls ON Authors.author_id = Scrolls.author_id GROUP BY Authors.name;</code>` },
+  9:  { text: `<em>"LEFT JOIN keeps ALL authors, even those with no scrolls!"</em> <code>SELECT Authors.name, Scrolls.title FROM Authors LEFT JOIN Scrolls ON Authors.author_id = Scrolls.author_id;</code>` },
+  10: { text: `<em>"HAVING filters groups AFTER grouping: <code>HAVING COUNT(*) > 1</code>"</em> — goes after GROUP BY!` },
+  11: { text: `<code>SELECT Authors.era, COUNT(*) FROM Authors JOIN Scrolls ON Authors.author_id = Scrolls.author_id GROUP BY Authors.era;</code>` },
+  12: { text: `Chain it: <code>... GROUP BY Authors.name ORDER BY COUNT(*) DESC LIMIT 1;</code>` },
+  13: { text: `<code>SELECT Authors.name FROM Authors JOIN Scrolls ON Authors.author_id = Scrolls.author_id WHERE Scrolls.topic = 'Halacha';</code>` },
+  14: { text: `<em>"Two conditions: era = 'Rishonim' AND topic != 'Halacha'"</em> — use both together with AND!` },
+  15: { text: `Full query: <code>SELECT Authors.name, Authors.era, COUNT(*) FROM Authors JOIN Scrolls ON Authors.author_id = Scrolls.author_id GROUP BY Authors.name, Authors.era ORDER BY Authors.name ASC;</code>` }
+};
+
+// ── Boss Farher questions (triggered after chapters 5 & 10) ──
+const FARHER_ROUNDS = {
+  after5: {
+    title: "🏛️ Rav Yochanan's Mid-Seder Farher",
+    subtitle: "The Sage tests your JOIN mastery. Three queries in 90 seconds!",
+    qs: [
+      {
+        schema: "TABLE Authors (author_id, name, era) | TABLE Scrolls (title, author_id)",
+        task: "SELECT the <em>title</em> and <em>name</em> of all scrolls using an <strong>INNER JOIN</strong> on <em>author_id</em>.",
+        expectedResult: JSON.stringify([{title:"Mishneh Torah",name:"Rambam"},{title:"Talmud Bavli",name:"Rav Ashi"},{title:"Commentary on Torah",name:"Rashi"},{title:"Otiot de-Rabbi Akiva",name:"Rabbi Akiva"},{title:"Moreh Nevuchim",name:"Rambam"},{title:"Sefer HaMitzvot",name:"Rambam"},{title:"Commentary on Talmud",name:"Rashi"}]),
+        hint: "SELECT Scrolls.title, Authors.name FROM Scrolls INNER JOIN Authors ON Scrolls.author_id = Authors.author_id;"
+      },
+      {
+        schema: "TABLE Authors (name, era) | TABLE Scrolls (title, author_id)",
+        task: "JOIN the tables and select <em>title</em> and <em>name</em> where <em>era</em> = <em>'Rishonim'</em>.",
+        expectedResult: JSON.stringify([{title:"Mishneh Torah",name:"Rambam"},{title:"Commentary on Torah",name:"Rashi"},{title:"Moreh Nevuchim",name:"Rambam"},{title:"Sefer HaMitzvot",name:"Rambam"},{title:"Commentary on Talmud",name:"Rashi"}]),
+        hint: "Add WHERE Authors.era = 'Rishonim' after your JOIN ON clause."
+      },
+      {
+        schema: "TABLE Scrolls (scroll_id, title, author_id, topic)",
+        task: "Use <strong>COUNT(*)</strong> aliased as <em>Total_Scrolls</em> to count all scrolls.",
+        expectedResult: JSON.stringify([{"Total_Scrolls":7}]),
+        hint: "SELECT COUNT(*) AS Total_Scrolls FROM Scrolls;"
+      }
+    ],
+    passReward: 150,
+    passText: "Rav Yochanan nods. 'Your JOIN knowledge is solid. Continue to the second half — GROUP BY awaits!' You earned 150 bonus XP!",
+    failText: "Rav Yochanan sighs gently. 'The JOIN needs more review. But continue — chazara will come later.'"
+  },
+  after10: {
+    title: "🏛️ Final Farher — End of Zman",
+    subtitle: "Rav Yochanan returns for the sof-zman farher. Three queries in 90 seconds!",
+    qs: [
+      {
+        schema: "TABLE Scrolls (topic)",
+        task: "Select <em>topic</em> and <strong>COUNT(*)</strong> from Scrolls, <strong>GROUP BY</strong> <em>topic</em>.",
+        expectedResult: JSON.stringify([{topic:"Chumash","COUNT(*)":1},{topic:"Gemara","COUNT(*)":2},{topic:"Halacha","COUNT(*)":2},{topic:"Midrash","COUNT(*)":1},{topic:"Philosophy","COUNT(*)":1}]),
+        hint: "SELECT topic, COUNT(*) FROM Scrolls GROUP BY topic;"
+      },
+      {
+        schema: "TABLE Authors | TABLE Scrolls — HAVING",
+        task: "Select <em>topic</em> and <strong>COUNT(*)</strong>, GROUP BY topic, <strong>HAVING COUNT(*) > 1</strong>.",
+        expectedResult: JSON.stringify([{topic:"Gemara","COUNT(*)":2},{topic:"Halacha","COUNT(*)":2}]),
+        hint: "SELECT topic, COUNT(*) FROM Scrolls GROUP BY topic HAVING COUNT(*) > 1;"
+      },
+      {
+        schema: "TABLE Authors | TABLE Scrolls — ORDER BY + LIMIT",
+        task: "JOIN tables, select <em>name</em> and <strong>COUNT(*)</strong>, GROUP BY <em>name</em>, ORDER BY COUNT(*) DESC, LIMIT 1.",
+        expectedResult: JSON.stringify([{name:"Rambam","COUNT(*)":3}]),
+        hint: "SELECT Authors.name, COUNT(*) FROM Authors JOIN Scrolls ON Authors.author_id = Scrolls.author_id GROUP BY Authors.name ORDER BY COUNT(*) DESC LIMIT 1;"
+      }
+    ],
+    passReward: 250,
+    passText: "Rav Yochanan stands and clasps your hands. 'You have mastered the Archives! The Siyum is well-deserved!' You earned 250 bonus XP!",
+    failText: "Rav Yochanan pats your shoulder. 'The wisdom is there — it just needs more practice. Proceed to the Siyum!'"
+  }
+};
+
+// ── Level 2 chapter definitions ──
+const chapters = {
+  1: {
+    title: "Perek 1: The Sage's Archives",
+    schema: "TABLE Authors (author_id, name, era)",
+    narrative: "Welcome to Level II. The legendary sage, Rav Yochanan, organized all texts into relational tables. 'Before we dive into the deep waters,' he says, 'let us review our scholars.'",
+    task: "Write a query to <strong>SELECT</strong> all columns from the <em>Authors</em> table.",
+    expectedResult: JSON.stringify([{author_id:1,name:"Rabbi Akiva",era:"Tannaim"},{author_id:2,name:"Rav Ashi",era:"Amoraim"},{author_id:3,name:"Rambam",era:"Rishonim"},{author_id:4,name:"Rashi",era:"Rishonim"},{author_id:5,name:"Vilna Gaon",era:"Acharonim"}]),
+    hints: ["Use SELECT * FROM Authors;", "The asterisk * means 'all columns'.", "Don't forget the semicolon at the end!"],
+    answerReveal: "SELECT * FROM Authors;",
+    next: 2
+  },
+  2: {
+    title: "Perek 2: The Sacred Scrolls",
+    schema: "TABLE Scrolls (scroll_id, title, author_id, topic)",
+    narrative: "Rav Yochanan gestures to the towering shelves. 'Here lie the scrolls. But numbers alone are meaningless without context. Let us view the inventory.'",
+    task: "<strong>SELECT</strong> all columns from the <em>Scrolls</em> table.",
+    expectedResult: JSON.stringify([{scroll_id:101,title:"Mishneh Torah",author_id:3,topic:"Halacha"},{scroll_id:102,title:"Talmud Bavli",author_id:2,topic:"Gemara"},{scroll_id:103,title:"Commentary on Torah",author_id:4,topic:"Chumash"},{scroll_id:104,title:"Otiot de-Rabbi Akiva",author_id:1,topic:"Midrash"},{scroll_id:105,title:"Moreh Nevuchim",author_id:3,topic:"Philosophy"},{scroll_id:106,title:"Sefer HaMitzvot",author_id:3,topic:"Halacha"},{scroll_id:107,title:"Commentary on Talmud",author_id:4,topic:"Gemara"}]),
+    hints: ["Use SELECT * FROM Scrolls;", "Notice the author_id column — that's the key linking to Authors!", "Seven scrolls in total."],
+    answerReveal: "SELECT * FROM Scrolls;",
+    next: 3
+  },
+  3: {
+    title: "Perek 3: The First Connection (JOIN)",
+    schema: "TABLE Authors (author_id, name) | TABLE Scrolls (title, author_id)",
+    narrative: "'Now the true wisdom begins,' says Rav Yochanan. 'A scroll means little without knowing who penned it. We must JOIN the tables together.'",
+    task: "Use an <strong>INNER JOIN</strong> on <em>author_id</em> to select the <em>title</em> from Scrolls and the <em>name</em> from Authors.",
+    expectedResult: JSON.stringify([{title:"Mishneh Torah",name:"Rambam"},{title:"Talmud Bavli",name:"Rav Ashi"},{title:"Commentary on Torah",name:"Rashi"},{title:"Otiot de-Rabbi Akiva",name:"Rabbi Akiva"},{title:"Moreh Nevuchim",name:"Rambam"},{title:"Sefer HaMitzvot",name:"Rambam"},{title:"Commentary on Talmud",name:"Rashi"}]),
+    hints: ["Use FROM Scrolls INNER JOIN Authors ON Scrolls.author_id = Authors.author_id", "SELECT Scrolls.title, Authors.name to be explicit about which table each column comes from.", "The full query: SELECT Scrolls.title, Authors.name FROM Scrolls INNER JOIN Authors ON Scrolls.author_id = Authors.author_id;"],
+    answerReveal: "SELECT Scrolls.title, Authors.name\nFROM Scrolls\nINNER JOIN Authors\n  ON Scrolls.author_id = Authors.author_id;",
+    next: 4
+  },
+  4: {
+    title: "Perek 4: Works of the Rishonim",
+    schema: "TABLE Authors | TABLE Scrolls",
+    narrative: "A bochur approaches, looking for classic medieval texts. 'I need to see only the titles and author names from the Rishonim era.'",
+    task: "<strong>JOIN</strong> the tables and filter using a <strong>WHERE</strong> clause for the era <em>'Rishonim'</em>. Select <em>title</em> and <em>name</em>.",
+    expectedResult: JSON.stringify([{title:"Mishneh Torah",name:"Rambam"},{title:"Commentary on Torah",name:"Rashi"},{title:"Moreh Nevuchim",name:"Rambam"},{title:"Sefer HaMitzvot",name:"Rambam"},{title:"Commentary on Talmud",name:"Rashi"}]),
+    hints: ["Start with the JOIN from Perek 3.", "Add WHERE Authors.era = 'Rishonim' after your JOIN ON condition.", "Full structure: SELECT ... FROM Scrolls JOIN Authors ON ... WHERE Authors.era = 'Rishonim';"],
+    answerReveal: "SELECT Scrolls.title, Authors.name\nFROM Scrolls\nINNER JOIN Authors\n  ON Scrolls.author_id = Authors.author_id\nWHERE Authors.era = 'Rishonim';",
+    next: 5
+  },
+  5: {
+    title: "Perek 5: The Rambam's Legacy",
+    schema: "TABLE Authors | TABLE Scrolls",
+    narrative: "You must assemble a collection of all works specifically authored by the Rambam to prepare for a special shiur.",
+    task: "<strong>JOIN</strong> the tables to select the <em>title</em> and <em>topic</em> of all scrolls where the author's name is <em>'Rambam'</em>.",
+    expectedResult: JSON.stringify([{title:"Mishneh Torah",topic:"Halacha"},{title:"Moreh Nevuchim",topic:"Philosophy"},{title:"Sefer HaMitzvot",topic:"Halacha"}]),
+    hints: ["JOIN the tables on author_id.", "SELECT title, topic (from Scrolls).", "WHERE Authors.name = 'Rambam'"],
+    answerReveal: "SELECT Scrolls.title, Scrolls.topic\nFROM Scrolls\nJOIN Authors\n  ON Scrolls.author_id = Authors.author_id\nWHERE Authors.name = 'Rambam';",
+    next: 6
+  },
+  6: {
+    title: "Perek 6: Counting the Texts",
+    schema: "TABLE Scrolls (scroll_id, title, author_id, topic)",
+    narrative: "Rav Yochanan needs to order protective cases. 'How many scrolls do we have in total?' he asks. Time to use an aggregate function.",
+    task: "Use the <strong>COUNT()</strong> function to find the total number of scrolls. Alias the result as <em>Total_Scrolls</em>.",
+    expectedResult: JSON.stringify([{"Total_Scrolls":7}]),
+    hints: ["Use COUNT(*) to count all rows.", "Use AS to alias: COUNT(*) AS Total_Scrolls", "SELECT COUNT(*) AS Total_Scrolls FROM Scrolls;"],
+    answerReveal: "SELECT COUNT(*) AS Total_Scrolls\nFROM Scrolls;",
+    next: 7
+  },
+  7: {
+    title: "Perek 7: Grouping by Topic",
+    schema: "TABLE Scrolls (topic)",
+    narrative: "'We must allocate shelf space by topic,' says the Sage. 'Tell me how many scrolls we have for each individual topic.'",
+    task: "Select <em>topic</em> and <strong>COUNT(*)</strong> from Scrolls, using <strong>GROUP BY</strong> <em>topic</em>.",
+    expectedResult: JSON.stringify([{topic:"Chumash","COUNT(*)":1},{topic:"Gemara","COUNT(*)":2},{topic:"Halacha","COUNT(*)":2},{topic:"Midrash","COUNT(*)":1},{topic:"Philosophy","COUNT(*)":1}]),
+    hints: ["SELECT both topic AND COUNT(*) — two columns.", "Add GROUP BY topic at the end.", "SELECT topic, COUNT(*) FROM Scrolls GROUP BY topic;"],
+    answerReveal: "SELECT topic, COUNT(*)\nFROM Scrolls\nGROUP BY topic;",
+    next: 8
+  },
+  8: {
+    title: "Perek 8: Prolific Authors",
+    schema: "TABLE Authors | TABLE Scrolls",
+    narrative: "Some scholars wrote more than others. Rav Yochanan wonders how many scrolls each author contributed to the library.",
+    task: "<strong>JOIN</strong> the tables. Select Author <em>name</em> and <strong>COUNT(scroll_id)</strong>, using <strong>GROUP BY</strong> <em>name</em>.",
+    expectedResult: JSON.stringify([{name:"Rabbi Akiva","COUNT(scroll_id)":1},{name:"Rambam","COUNT(scroll_id)":3},{name:"Rashi","COUNT(scroll_id)":2},{name:"Rav Ashi","COUNT(scroll_id)":1}]),
+    hints: ["JOIN the tables on author_id.", "SELECT Authors.name and COUNT(Scrolls.scroll_id).", "GROUP BY Authors.name at the end."],
+    answerReveal: "SELECT Authors.name, COUNT(Scrolls.scroll_id)\nFROM Authors\nJOIN Scrolls\n  ON Authors.author_id = Scrolls.author_id\nGROUP BY Authors.name;",
+    next: 9
+  },
+  9: {
+    title: "Perek 9: The Missing Link (LEFT JOIN)",
+    schema: "TABLE Authors (LEFT JOIN) TABLE Scrolls",
+    narrative: "We must ensure no sage is forgotten! Some authors might not have their scrolls cataloged yet. We need a list of ALL authors, even if they have 0 scrolls.",
+    task: "Use a <strong>LEFT JOIN</strong> from Authors to Scrolls. Select <em>name</em> and <em>title</em>.",
+    expectedResult: JSON.stringify([{name:"Rabbi Akiva",title:"Otiot de-Rabbi Akiva"},{name:"Rav Ashi",title:"Talmud Bavli"},{name:"Rambam",title:"Mishneh Torah"},{name:"Rambam",title:"Moreh Nevuchim"},{name:"Rambam",title:"Sefer HaMitzvot"},{name:"Rashi",title:"Commentary on Torah"},{name:"Rashi",title:"Commentary on Talmud"},{name:"Vilna Gaon",title:null}]),
+    hints: ["Use LEFT JOIN instead of INNER JOIN.", "FROM Authors LEFT JOIN Scrolls ON Authors.author_id = Scrolls.author_id", "The Vilna Gaon will appear with title = NULL since he has no scrolls cataloged."],
+    answerReveal: "SELECT Authors.name, Scrolls.title\nFROM Authors\nLEFT JOIN Scrolls\n  ON Authors.author_id = Scrolls.author_id;",
+    next: 10
+  },
+  10: {
+    title: "Perek 10: Filtering the Groups (HAVING)",
+    schema: "TABLE Scrolls (topic) — HAVING",
+    narrative: "Shelf space is running low. 'Show me only the topics that have MORE THAN 1 scroll,' commands Rav Yochanan.",
+    task: "Select <em>topic</em> and <strong>COUNT(*)</strong> from Scrolls, use <strong>GROUP BY</strong> <em>topic</em>, and use <strong>HAVING COUNT(*) > 1</strong>.",
+    expectedResult: JSON.stringify([{topic:"Gemara","COUNT(*)":2},{topic:"Halacha","COUNT(*)":2}]),
+    hints: ["Start with GROUP BY topic from Perek 7.", "Add HAVING COUNT(*) > 1 after the GROUP BY.", "HAVING filters groups; WHERE filters rows. They work at different stages!"],
+    answerReveal: "SELECT topic, COUNT(*)\nFROM Scrolls\nGROUP BY topic\nHAVING COUNT(*) > 1;",
+    next: 11
+  },
+  11: {
+    title: "Perek 11: Works by Era",
+    schema: "TABLE Authors | TABLE Scrolls",
+    narrative: "History provides perspective. Group the scrolls by the era in which they were written to see which era produced the most texts.",
+    task: "<strong>JOIN</strong> the tables. Select <em>era</em> and <strong>COUNT(*)</strong>, grouping by <em>era</em>.",
+    expectedResult: JSON.stringify([{era:"Amoraim","COUNT(*)":1},{era:"Rishonim","COUNT(*)":5},{era:"Tannaim","COUNT(*)":1}]),
+    hints: ["JOIN the tables on author_id.", "SELECT Authors.era, COUNT(*)", "GROUP BY Authors.era"],
+    answerReveal: "SELECT Authors.era, COUNT(*)\nFROM Authors\nJOIN Scrolls\n  ON Authors.author_id = Scrolls.author_id\nGROUP BY Authors.era;",
+    next: 12
+  },
+  12: {
+    title: "Perek 12: Identifying the Most Prolific",
+    schema: "GROUP BY and ORDER BY",
+    narrative: "Who is our most prolific author? Rav Yochanan wants to dedicate a special plaque to them.",
+    task: "<strong>JOIN</strong> the tables, select <em>name</em> and <strong>COUNT(*)</strong>. <strong>GROUP BY</strong> <em>name</em>, <strong>ORDER BY COUNT(*) DESC</strong>, and <strong>LIMIT 1</strong>.",
+    expectedResult: JSON.stringify([{name:"Rambam","COUNT(*)":3}]),
+    hints: ["Chain your clauses: JOIN... GROUP BY name... ORDER BY COUNT(*) DESC LIMIT 1;", "ORDER BY COUNT(*) DESC puts the highest count first.", "LIMIT 1 gives you only the top result."],
+    answerReveal: "SELECT Authors.name, COUNT(*)\nFROM Authors\nJOIN Scrolls\n  ON Authors.author_id = Scrolls.author_id\nGROUP BY Authors.name\nORDER BY COUNT(*) DESC\nLIMIT 1;",
+    next: 13
+  },
+  13: {
+    title: "Perek 13: The Halachic Search",
+    schema: "TABLE Authors | TABLE Scrolls",
+    narrative: "A bochur needs a definitive psak halacha. He asks for the names of all authors who have written scrolls on the topic of 'Halacha'.",
+    task: "<strong>JOIN</strong> the tables. Select <em>name</em> where the <em>topic</em> is <em>'Halacha'</em>.",
+    expectedResult: JSON.stringify([{name:"Rambam"},{name:"Rambam"}]),
+    hints: ["JOIN tables on author_id.", "SELECT Authors.name", "WHERE Scrolls.topic = 'Halacha'"],
+    answerReveal: "SELECT Authors.name\nFROM Authors\nJOIN Scrolls\n  ON Authors.author_id = Scrolls.author_id\nWHERE Scrolls.topic = 'Halacha';",
+    next: 14
+  },
+  14: {
+    title: "Perek 14: Complex Filtering",
+    schema: "TABLE Authors | TABLE Scrolls",
+    narrative: "The librarian requests a specific cross-section of data: Titles of scrolls written by Rishonim that are NOT about Halacha.",
+    task: "<strong>JOIN</strong> tables. Select <em>title</em> WHERE <em>era</em> is <em>'Rishonim'</em> AND <em>topic</em> is NOT <em>'Halacha'</em>.",
+    expectedResult: JSON.stringify([{title:"Commentary on Torah"},{title:"Moreh Nevuchim"},{title:"Commentary on Talmud"}]),
+    hints: ["JOIN the tables.", "WHERE Authors.era = 'Rishonim'", "AND Scrolls.topic != 'Halacha' — use != for NOT EQUAL"],
+    answerReveal: "SELECT Scrolls.title\nFROM Scrolls\nJOIN Authors\n  ON Scrolls.author_id = Authors.author_id\nWHERE Authors.era = 'Rishonim'\n  AND Scrolls.topic != 'Halacha';",
+    next: 15
+  },
+  15: {
+    title: "Perek 15: The Final Farher",
+    schema: "TABLE Authors | TABLE Scrolls",
+    narrative: "Rav Yochanan smiles. 'You have mastered the archives. One final test: List every author name, their era, and the count of their scrolls, ordered alphabetically.'",
+    task: "<strong>JOIN</strong> tables. Select <em>name</em>, <em>era</em>, and <strong>COUNT(*)</strong>. <strong>GROUP BY</strong> <em>name</em> and <em>era</em>, then <strong>ORDER BY</strong> <em>name ASC</em>.",
+    expectedResult: JSON.stringify([{name:"Rabbi Akiva",era:"Tannaim","COUNT(*)":1},{name:"Rambam",era:"Rishonim","COUNT(*)":3},{name:"Rashi",era:"Rishonim","COUNT(*)":2},{name:"Rav Ashi",era:"Amoraim","COUNT(*)":1}]),
+    hints: ["JOIN the tables on author_id.", "GROUP BY Authors.name, Authors.era — GROUP BY both columns since you're selecting both.", "ORDER BY Authors.name ASC for alphabetical order."],
+    answerReveal: "SELECT Authors.name, Authors.era, COUNT(*)\nFROM Authors\nJOIN Scrolls\n  ON Authors.author_id = Scrolls.author_id\nGROUP BY Authors.name, Authors.era\nORDER BY Authors.name ASC;",
+    next: 'END'
+  }
+};
+
+const PEREK_KEYS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15];
+
+// ===================================================================
+// SQL INIT — Level 2 Database (Authors + Scrolls)
+// ===================================================================
+async function initDB() {
+  const SQL = await initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.11.0/${f}` });
+  db = new SQL.Database();
+
+  // Create Tables for Level 2
+  db.run(`CREATE TABLE Authors (author_id INTEGER PRIMARY KEY, name TEXT, era TEXT);`);
+  db.run(`CREATE TABLE Scrolls (scroll_id INTEGER PRIMARY KEY, title TEXT, author_id INTEGER, topic TEXT);`);
+
+  // Insert Data
+  db.run(`INSERT INTO Authors (author_id, name, era) VALUES 
+    (1, 'Rabbi Akiva', 'Tannaim'),
+    (2, 'Rav Ashi', 'Amoraim'),
+    (3, 'Rambam', 'Rishonim'),
+    (4, 'Rashi', 'Rishonim'),
+    (5, 'Vilna Gaon', 'Acharonim');`);
+
+  db.run(`INSERT INTO Scrolls (scroll_id, title, author_id, topic) VALUES 
+    (101, 'Mishneh Torah', 3, 'Halacha'),
+    (102, 'Talmud Bavli', 2, 'Gemara'),
+    (103, 'Commentary on Torah', 4, 'Chumash'),
+    (104, 'Otiot de-Rabbi Akiva', 1, 'Midrash'),
+    (105, 'Moreh Nevuchim', 3, 'Philosophy'),
+    (106, 'Sefer HaMitzvot', 3, 'Halacha'),
+    (107, 'Commentary on Talmud', 4, 'Gemara');`);
+
+  // Seed farher tables
+  seedFarherTables();
+}
+
+// ===================================================================
+// SCREEN MANAGEMENT
+// ===================================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function pickAvatar(el) {
+  document.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  avatar = el.dataset.emoji;
+}
+
+function showBackstory() {
+  captainName = document.getElementById('name-input').value.trim() || "Reb Chaim";
+  document.getElementById('avatar-name').textContent = captainName;
+  const emojiEl = document.getElementById('avatar-emoji');
+  if (emojiEl) emojiEl.textContent = avatar;
+  document.getElementById('header-status').textContent = `${captainName} • Perek 1`;
+  document.getElementById('header-status').classList.add('visible');
+  showScreen('screen-backstory');
+}
+
+function startGame() {
+  buildPerekDots();
+  renderOtzar();
+  showScreen('screen-game');
+  loadChapter(1);
+  if (typeof setAvatarExpression === 'function') setAvatarExpression('neutral');
+  updateArchiveScrolls();
+}
+
+// ===================================================================
+// PEREK DOTS
+// ===================================================================
+function buildPerekDots() {
+  const container = document.getElementById('perek-dots');
+  container.innerHTML = '';
+  const labels = {1:'א',2:'ב',3:'ג',4:'ד',5:'ה',6:'ו',7:'ז',8:'ח',9:'ט',10:'י',11:'יא',12:'יב',13:'יג',14:'יד',15:'טו'};
+  PEREK_KEYS.forEach(k => {
+    const d = document.createElement('div');
+    d.className = 'zman-dot';
+    d.id = 'dot-' + k;
+    d.textContent = labels[k];
+    d.title = chapters[k]?.title || '';
+    container.appendChild(d);
+  });
+}
+
+function updateDots(ch) {
+  PEREK_KEYS.forEach(k => {
+    const d = document.getElementById('dot-' + k);
+    if (!d) return;
+    d.classList.remove('completed','current');
+    if (chaptersCompleted.includes(k)) d.classList.add('completed');
+    else if (k == ch) d.classList.add('current');
+  });
+}
+
+// ===================================================================
+// XP & MADREIGA
+// ===================================================================
+function addXP(amount) {
+  xp += amount;
+  document.getElementById('xp-value').textContent = `${xp} XP`;
+  const maxXP = 1200;
+  const pct = Math.min(100, Math.round(xp / maxXP * 100));
+  document.getElementById('xp-bar').style.width = pct + '%';
+  let level = MADREIGA_LEVELS[0].label;
+  for (const l of MADREIGA_LEVELS) { if (xp >= l.min) level = l.label; }
+  document.getElementById('madreiga-label').textContent = level;
+  document.getElementById('avatar-title').textContent = level;
+  updateArchiveScrolls();
+}
+
+function rotateChazal() {
+  const q = CHAZAL_QUOTES[Math.floor(Math.random() * CHAZAL_QUOTES.length)];
+  document.getElementById('chazal-quote').textContent = q;
+}
+
+// ===================================================================
+// LOAD CHAPTER
+// ===================================================================
+function loadChapter(ch) {
+  currentChapter = ch;
+  hintIndex = 0;
+  wrongAttempts = 0;
+  const chap = chapters[ch];
+  document.getElementById('task-title-display').textContent = chap.title;
+  document.getElementById('schema-display').innerHTML = `<strong style="color:var(--gold-dim)">Schema:</strong> ${chap.schema}`;
+  document.getElementById('task-desc-display').innerHTML = chap.task;
+  pickNewTrivia();
+  document.getElementById('echad-input').value = '';
+  document.getElementById('query-input').value = '';
+  document.getElementById('query-input').style.pointerEvents = '';
+  document.getElementById('query-input').style.opacity = '';
+  document.getElementById('highlight-overlay').innerHTML = '';
+  updateLineNumbers('');
+  document.getElementById('result-area').style.display = 'none';
+  document.getElementById('next-btn').classList.remove('visible');
+  document.getElementById('header-status').textContent = `${avatar} ${captainName} • ${chap.title}`;
+  updateDots(ch);
+  rotateChazal();
+  closeMashgiach();
+  typeWriter(chap.narrative, document.getElementById('narrative-box'));
+}
+
+// ===================================================================
+// CHAPTER TRANSITION
+// ===================================================================
+function doChapterTransition(label, cb) {
+  const overlay = document.getElementById('chapter-overlay');
+  const flashLabel = document.getElementById('chapter-flash-label');
+  flashLabel.textContent = label;
+  overlay.classList.add('active');
+  setTimeout(() => {
+    cb();
+    setTimeout(() => overlay.classList.remove('active'), 600);
+  }, 700);
+}
+
+function nextChapter() {
+  const farhers = { 6: 'after5', 11: 'after10' };
+  if (farhers[nextPerekDest] && !chaptersCompleted.includes('farher_' + farhers[nextPerekDest])) {
+    triggerFarher(farhers[nextPerekDest], nextPerekDest);
+    return;
+  }
+  if (nextPerekDest === 'END') {
+    doChapterTransition('סיום מסכת!', showSiyum);
+  } else {
+    doChapterTransition(chapters[nextPerekDest]?.title || 'Next Perek', () => loadChapter(nextPerekDest));
+  }
+}
+
+function showSiyum() {
+  showScreen('screen-siyum');
+  launchConfetti();
+  if (typeof setAvatarExpression === 'function') setAvatarExpression('happy');
+}
+
+function revealSecretCode() {
+  document.getElementById('reveal-code-btn').style.display = 'none';
+  document.getElementById('secret-code-wrap').style.display = 'flex';
+}
+
+function copySecretCode() {
+  const codeText = document.getElementById('secret-code-display').innerText;
+  navigator.clipboard.writeText(codeText).then(() => {
+    const copyBtn = document.getElementById('copy-code-btn');
+    copyBtn.textContent = 'Copied!';
+    setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+  });
+}
+
+// ===================================================================
+// SQL RESULT COMPARISON
+// ===================================================================
+function normRow(row) {
+  const sorted = {};
+  Object.keys(row).sort().forEach(k => {
+    const v = row[k];
+    sorted[k] = (typeof v === 'string') ? v.trim() : v;
+  });
+  return JSON.stringify(sorted);
+}
+
+function compareSqlResults(userRows, expectedRows) {
+  if (!Array.isArray(userRows) || !Array.isArray(expectedRows)) return false;
+  if (userRows.length !== expectedRows.length) return false;
+  const userSorted = userRows.map(normRow).sort();
+  const expSorted  = expectedRows.map(normRow).sort();
+  return userSorted.every((r, i) => r === expSorted[i]);
+}
+
+// ===================================================================
+// QUERY RUNNER
+// ===================================================================
+function runQuery() {
+  if (typeof setAvatarExpression === 'function') setAvatarExpression('thinking');
+  const query = document.getElementById('query-input').value.trim();
+  if (!query || !db) { showToast('error', "Write a query first, don't be a batlan!"); return; }
+  const resultArea = document.getElementById('result-area');
+  const resultInner = document.getElementById('result-inner');
+  resultArea.style.display = 'block';
+  try {
+    const stmt = db.exec(query);
+    if (stmt.length === 0 || stmt[0].values.length === 0) {
+      wrongAttempts++;
+      resultInner.innerHTML = `<div class="feedback-wrong">❌ ${getRandom(wrongInsults)} <br><span style="color:var(--ink-faint);font-size:0.85em">Query ran but returned zero rows.</span></div>`;
+      maybeShowMashgiach();
+      if (typeof setAvatarExpression === 'function') { setAvatarExpression('sad'); setTimeout(()=>setAvatarExpression('thinking'), 3500); }
+      return;
+    }
+    const columns = stmt[0].columns;
+    let html = `<table class="result-table"><tr>${columns.map(c=>`<th>${c}</th>`).join('')}</tr>`;
+    stmt[0].values.forEach(row => { html += `<tr>${row.map(c=>`<td>${c ?? 'NULL'}</td>`).join('')}</tr>`; });
+    html += `</table>`;
+    const userRows = stmt[0].values.map((row) => {
+      const obj = {}; columns.forEach((c,i) => obj[c] = row[i]); return obj;
+    });
+    const chap = chapters[currentChapter];
+    const expectedRows = JSON.parse(chap.expectedResult);
+    if (compareSqlResults(userRows, expectedRows)) {
+      resultInner.innerHTML = `<div class="feedback-correct">✅ ${getRandom(rightComplements)}</div>${html}`;
+      chaptersCompleted.push(currentChapter);
+      wrongAttempts = 0;
+      closeMashgiach();
+      addXP(75);
+      updateDots(currentChapter);
+      launchConfetti();
+      checkAndAwardSefer(currentChapter);
+      if (typeof setAvatarExpression === 'function') { setAvatarExpression('happy'); setTimeout(()=>setAvatarExpression('neutral'), 4000); }
+      document.getElementById('query-input').style.pointerEvents = 'none';
+      document.getElementById('query-input').style.opacity = '0.4';
+      nextPerekDest = chap.next;
+      const btn = document.getElementById('next-btn');
+      btn.classList.add('visible');
+      btn.textContent = nextPerekDest === 'END' ? 'Make the Siyum! 🎉' : `Proceed to Next Perek ➡`;
+    } else {
+      wrongAttempts++;
+      resultInner.innerHTML = `<div class="feedback-wrong">❌ ${getRandom(wrongInsults)} Result doesn't match what Rav Yochanan asked for.</div>${html}`;
+      maybeShowMashgiach();
+      if (typeof setAvatarExpression === 'function') { setAvatarExpression('sad'); setTimeout(()=>setAvatarExpression('thinking'), 3500); }
+    }
+  } catch(e) {
+    wrongAttempts++;
+    resultInner.innerHTML = `<div class="feedback-wrong" style="font-family:'Courier Prime',monospace;font-size:0.85em">SQL Error: ${e.message}</div>`;
+    maybeShowMashgiach();
+    if (typeof setAvatarExpression === 'function') { setAvatarExpression('sad'); setTimeout(()=>setAvatarExpression('thinking'), 3500); }
+  }
+}
+
+// ===================================================================
+// HINT SYSTEM
+// ===================================================================
+function showHint() {
+  const chap = chapters[currentChapter];
+  document.getElementById('hint-num').textContent = hintIndex + 1;
+  document.getElementById('hint-body').textContent = chap.hints[hintIndex];
+  document.getElementById('hint-toast').classList.add('visible');
+  if (hintIndex < 2) hintIndex++;
+}
+function closeHintToast() { document.getElementById('hint-toast').classList.remove('visible'); }
+
+// ===================================================================
+// TRIVIA SYSTEM
+// ===================================================================
+function pickNewTrivia() {
+  currentTrivia = getRandom(TORAH_TRIVIA_POOL);
+  document.getElementById('echad-question').textContent = currentTrivia.q;
+  document.getElementById('echad-category').textContent = currentTrivia.cat;
+}
+
+function revealAnswer() {
+  const chap = chapters[currentChapter];
+  const guess = parseInt(document.getElementById('echad-input').value.trim(), 10);
+  if (!currentTrivia) return;
+  if (guess === currentTrivia.a) {
+    document.getElementById('query-input').value = chap.answerReveal;
+    syncHighlight();
+    updateLineNumbers(chap.answerReveal);
+    showToast('success', 'Yashar Koach! The answer has been revealed. (' + currentTrivia.a + ' was correct!)');
+    pickNewTrivia();
+    document.getElementById('echad-input').value = '';
+  } else if (isNaN(guess)) {
+    showToast('error', 'Enter a number! This is Echad Mi Yodea, not an essay question.');
+  } else {
+    showToast('error', `Nu nu... ${guess} is not the right answer. Hint: it's between 1 and 613!`);
+    pickNewTrivia();
+    document.getElementById('echad-input').value = '';
+  }
+}
+
+function showToast(type, msg) {
+  document.getElementById('hint-num').textContent = type === 'success' ? '✓' : '✗';
+  document.getElementById('hint-body').textContent = msg;
+  const toast = document.getElementById('hint-toast');
+  toast.style.borderColor = type === 'success' ? 'var(--correct)' : 'var(--wrong)';
+  toast.classList.add('visible');
+  setTimeout(() => { toast.classList.remove('visible'); toast.style.borderColor = ''; }, 3800);
+}
+
+// ===================================================================
+// TYPEWRITER
+// ===================================================================
+function typeWriter(html, el, speed = 15) {
+  if (typeWriterTimer) clearInterval(typeWriterTimer);
+  el.innerHTML = '';
+  const template = document.createElement('div');
+  template.innerHTML = html;
+  const textNodes = [];
+  function collectText(node) {
+    if (node.nodeType === 3) textNodes.push({ type:'text', content: node.textContent });
+    else if (node.nodeType === 1) {
+      textNodes.push({ type:'open', tag: node.outerHTML.split(node.innerHTML)[0] });
+      node.childNodes.forEach(collectText);
+      textNodes.push({ type:'close', tag: `</${node.tagName.toLowerCase()}>` });
+    }
+  }
+  template.childNodes.forEach(collectText);
+  const stream = [];
+  textNodes.forEach(t => {
+    if (t.type === 'text') { for(const c of t.content) stream.push({char:c}); }
+    else stream.push({tag: (t.type==='open'?t.tag:t.tag)});
+  });
+  let cursor = document.createElement('span');
+  cursor.className = 'narrative-cursor';
+  el.appendChild(cursor);
+  let idx = 0;
+  typeWriterTimer = setInterval(() => {
+    if (idx >= stream.length) { clearInterval(typeWriterTimer); cursor.remove(); return; }
+    const item = stream[idx];
+    if (item.tag !== undefined) cursor.insertAdjacentHTML('beforebegin', item.tag);
+    else cursor.insertAdjacentText('beforebegin', item.char);
+    idx++;
+  }, speed);
+}
+
+// ===================================================================
+// SQL SYNTAX HIGHLIGHTER
+// ===================================================================
+const SQL_KEYWORDS = /\b(SELECT|FROM|WHERE|AND|OR|NOT|ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT|OFFSET|INSERT|INTO|VALUES|UPDATE|SET|DELETE|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AS|DISTINCT|COUNT|SUM|AVG|MIN|MAX|IN|LIKE|BETWEEN|IS|NULL|CREATE|TABLE|DROP|ALTER|INDEX|UNIQUE|PRIMARY|KEY|DESC|ASC|ALL|UNION|EXISTS)\b/gi;
+const SQL_STRINGS = /'[^']*'/g;
+const SQL_NUMBERS = /\b\d+(\.\d+)?\b/g;
+const SQL_COMMENTS = /--[^\n]*/g;
+const SQL_FUNCTIONS = /\b(COUNT|SUM|AVG|MIN|MAX|COALESCE|IFNULL|TRIM|UPPER|LOWER|LENGTH|SUBSTR|REPLACE)\b(?=\s*\()/gi;
+
+function highlightSQL(code) {
+  let h = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const strings = [], comments = [];
+  h = h.replace(SQL_COMMENTS, m => { comments.push(m); return `\x00C${comments.length-1}\x00`; });
+  h = h.replace(SQL_STRINGS, m => { strings.push(m); return `\x00S${strings.length-1}\x00`; });
+  h = h.replace(SQL_FUNCTIONS, m => `<span class="sql-function">${m}</span>`);
+  h = h.replace(SQL_KEYWORDS, m => `<span class="sql-keyword">${m}</span>`);
+  h = h.replace(SQL_NUMBERS, m => `<span class="sql-number">${m}</span>`);
+  h = h.replace(/\x00S(\d+)\x00/g, (_,i) => `<span class="sql-string">${strings[i]}</span>`);
+  h = h.replace(/\x00C(\d+)\x00/g, (_,i) => `<span class="sql-comment">${comments[i]}</span>`);
+  return h;
+}
+function syncHighlight() {
+  const val = document.getElementById('query-input').value;
+  document.getElementById('highlight-overlay').innerHTML = highlightSQL(val) + ' ';
+}
+function updateLineNumbers(val) {
+  const lines = val.split('\n').length || 1;
+  let nums = '';
+  for(let i=1; i<=Math.max(lines,1); i++) nums += i + '\n';
+  document.getElementById('line-numbers').textContent = nums.trimEnd();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const ta = document.getElementById('query-input');
+  if (ta) {
+    ta.addEventListener('input', () => { syncHighlight(); updateLineNumbers(ta.value); });
+    ta.addEventListener('scroll', () => {
+      document.getElementById('highlight-overlay').scrollTop = ta.scrollTop;
+      document.getElementById('highlight-overlay').scrollLeft = ta.scrollLeft;
+      document.getElementById('line-numbers').scrollTop = ta.scrollTop;
+    });
+    ta.addEventListener('keydown', e => {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const s = ta.selectionStart, end = ta.selectionEnd;
+        ta.value = ta.value.substring(0,s) + '  ' + ta.value.substring(end);
+        ta.selectionStart = ta.selectionEnd = s + 2;
+        syncHighlight();
+      }
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runQuery(); }
+    });
+  }
+  
+  // Gate auto-focus and Enter key
+  const gateInput = document.getElementById('gate-code-input');
+  if (gateInput) {
+    gateInput.focus();
+    gateInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') validateGate(); });
+  }
+
+  // --- PROGRESS LOADING LOGIC (MOVED INSIDE THE BLOCK) ---
+  const savedName = localStorage.getItem('sql_game_captainName');
+  const savedAvatar = localStorage.getItem('sql_game_avatar');
+  const savedXP = localStorage.getItem('sql_game_xp');
+
+  if (savedName && savedAvatar) {
+    // Inject the data
+    captainName = savedName;
+    avatar = savedAvatar;
+    xp = parseInt(savedXP) || 0;
+
+    // Skip intro screens and go straight to Level 2
+    showScreen('screen-game');
+    
+    // Update the sidebar UI
+    const nameDisplay = document.getElementById('avatar-name');
+    const avatarDisplay = document.getElementById('avatar-emoji');
+    if (nameDisplay) nameDisplay.textContent = captainName;
+    if (avatarDisplay) avatarDisplay.textContent = avatar;
+
+    // Apply the specific avatar style
+    if (typeof applyAvatarStyle === 'function') applyAvatarStyle(avatar);
+    
+    // Start the game at Level 2 (Perek 16)
+    if (typeof loadChapter === 'function') loadChapter(16);
+    
+    console.log("Welcome to the Archives, " + captainName);
+  }
+}); // This is the ONLY closing brace needed for the whole block
+
+// ===================================================================
+// CONFETTI
+// ===================================================================
+let confettiAnimFrame = null;
+const GEMARA_CHARS = ['א','ב','ג','ד','ה','ו','ז','ח','ט','י','כ','ל','מ','נ','ס','ע','פ','צ','ק','ר','ש','ת'];
+
+function launchConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  canvas.style.display = 'block';
+  // Level 2 confetti — blue/silver palette
+  const particles = Array.from({length: 60}, () => ({
+    x: Math.random() * canvas.width,
+    y: -20 - Math.random() * 80,
+    vx: (Math.random() - 0.5) * 3,
+    vy: 2 + Math.random() * 3,
+    angle: Math.random() * Math.PI * 2,
+    va: (Math.random() - 0.5) * 0.12,
+    size: 12 + Math.random() * 14,
+    char: GEMARA_CHARS[Math.floor(Math.random() * GEMARA_CHARS.length)],
+    color: Math.random() > 0.5 ? '#aad0ff' : (Math.random() > 0.5 ? '#d8e8ff' : '#60e0a0'),
+    opacity: 1,
+    isPage: Math.random() > 0.5
+  }));
+  if (confettiAnimFrame) cancelAnimationFrame(confettiAnimFrame);
+  let start = null;
+  const DURATION = 3200;
+  function draw(ts) {
+    if (!start) start = ts;
+    const elapsed = ts - start;
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.angle += p.va; p.vy += 0.06;
+      p.opacity = Math.max(0, 1 - (elapsed / DURATION) * 0.7);
+      ctx.save();
+      ctx.globalAlpha = p.opacity;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      if (p.isPage) {
+        ctx.fillStyle = '#d8e8ff';
+        ctx.strokeStyle = '#7aaeff';
+        ctx.lineWidth = 0.8;
+        const w = p.size * 0.8, h = p.size;
+        ctx.fillRect(-w/2, -h/2, w, h);
+        ctx.strokeRect(-w/2, -h/2, w, h);
+        ctx.fillStyle = '#3060c0';
+        ctx.font = `${p.size * 0.4}px "IM Fell English", serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(p.char, 0, 0);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0,0,p.size/4,0,Math.PI*2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0,-p.size/2.5); ctx.lineTo(0,p.size/2.5);
+        ctx.moveTo(-p.size/2.5,0); ctx.lineTo(p.size/2.5,0);
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+    if (elapsed < DURATION) { confettiAnimFrame = requestAnimationFrame(draw); }
+    else { ctx.clearRect(0,0,canvas.width,canvas.height); canvas.style.display = 'none'; }
+  }
+  confettiAnimFrame = requestAnimationFrame(draw);
+}
+
+// ===================================================================
+// INVENTORY / OTZAR SYSTEM
+// ===================================================================
+function checkAndAwardSefer(ch) {
+  const sefer = SEFORIM_CATALOG.find(s => s.earnAt === ch && !inventory.find(i => i.id === s.id));
+  if (!sefer) return;
+  inventory.push(sefer);
+  renderOtzar();
+  showItemEarnToast(sefer);
+}
+function renderOtzar() {
+  const shelf = document.getElementById('otzar-shelf');
+  const empty = document.getElementById('otzar-empty');
+  if (inventory.length === 0) { empty.style.display = 'block'; shelf.querySelectorAll('.sefer-item').forEach(el => el.remove()); return; }
+  empty.style.display = 'none';
+  shelf.querySelectorAll('.sefer-item').forEach(el => el.remove());
+  inventory.forEach(sefer => {
+    const el = document.createElement('div');
+    el.className = 'sefer-item new-item';
+    el.innerHTML = `${sefer.emoji}<div class="sefer-tooltip"><strong>${sefer.emoji} ${sefer.name}</strong>${sefer.hint}</div>`;
+    el.onclick = () => showSeferHint(sefer);
+    shelf.appendChild(el);
+    setTimeout(() => el.classList.remove('new-item'), 700);
+  });
+}
+function showSeferHint(sefer) {
+  document.getElementById('hint-num').textContent = '📖';
+  document.getElementById('hint-body').innerHTML = `<strong style="color:var(--gold-bright)">${sefer.name}</strong><br>${sefer.hint}`;
+  const toast = document.getElementById('hint-toast');
+  toast.style.borderColor = 'var(--gold)';
+  toast.classList.add('visible');
+  setTimeout(() => { toast.classList.remove('visible'); toast.style.borderColor = ''; }, 6000);
+}
+function showItemEarnToast(sefer) {
+  document.getElementById('item-earn-emoji').textContent = sefer.emoji;
+  document.getElementById('item-earn-name').textContent = sefer.name;
+  document.getElementById('item-earn-desc').textContent = 'Added to your Otzar! Tap it for SQL wisdom.';
+  const t = document.getElementById('item-earn-toast');
+  t.classList.add('visible');
+  setTimeout(() => t.classList.remove('visible'), 4500);
+}
+function toggleOtzar() {
+  const shelf = document.getElementById('otzar-shelf');
+  const empty = document.getElementById('otzar-empty');
+  const visible = shelf.style.display !== 'none';
+  shelf.style.display = visible ? 'none' : 'flex';
+  if (empty) empty.style.display = visible ? 'none' : (inventory.length === 0 ? 'block' : 'none');
+}
+
+// ===================================================================
+// MASHGIACH POPUP
+// ===================================================================
+function maybeShowMashgiach() {
+  if (wrongAttempts < 2) return;
+  const deepHint = MASHGIACH_DEEP_HINTS[currentChapter];
+  if (!deepHint) return;
+  document.getElementById('mashgiach-text').innerHTML = deepHint.text;
+  document.getElementById('mashgiach-popup').classList.add('visible');
+}
+function closeMashgiach() { document.getElementById('mashgiach-popup').classList.remove('visible'); }
+
+// ===================================================================
+// MAP MODAL
+// ===================================================================
+function openMapModal() { document.getElementById('map-modal').classList.add('active'); }
+function closeMapModal() { document.getElementById('map-modal').classList.remove('active'); }
+
+// ===================================================================
+// BOSS FARHER SYSTEM
+// ===================================================================
+function buildFarherDots(count, activeIndex) {
+  const container = document.getElementById('farher-q-dots');
+  container.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'farher-q-dot' + (i === activeIndex ? ' active' : '');
+    dot.id = 'fqd-' + i;
+    dot.textContent = i + 1;
+    container.appendChild(dot);
+  }
+}
+function triggerFarher(roundKey, pendingChapter) {
+  farherPendingNext = pendingChapter;
+  farherLastRoundKey = roundKey;
+  farherActive = true;
+  farherQIndex = 0;
+  farherPassed = new Array(FARHER_ROUNDS[roundKey].qs.length).fill(false);
+  farherTimeLeft = 90;
+  const round = FARHER_ROUNDS[roundKey];
+  const flash = document.getElementById('boss-flash');
+  flash.classList.add('active');
+  setTimeout(() => flash.classList.remove('active'), 800);
+  document.getElementById('farher-title').textContent = round.title;
+  document.getElementById('farher-subtitle').textContent = round.subtitle;
+  document.getElementById('farher-outcome').classList.remove('active','pass','fail');
+  document.getElementById('farher-question-box').style.display = 'block';
+  document.getElementById('farher-result-msg').textContent = '';
+  buildFarherDots(round.qs.length, 0);
+  loadFarherQuestion(round, 0);
+  document.getElementById('farher-modal').classList.add('active');
+  updateTimerRing(90, 90);
+  if (farherTimerInterval) clearInterval(farherTimerInterval);
+  farherTimerInterval = setInterval(() => {
+    farherTimeLeft--;
+    updateTimerRing(farherTimeLeft, 90);
+    if (farherTimeLeft <= 0) {
+      clearInterval(farherTimerInterval);
+      endFarher(roundKey, false, 'Time is up! Rav Yochanan frowns. Keep reviewing your SQL!');
+    }
+  }, 1000);
+}
+function loadFarherQuestion(round, idx) {
+  if (!round || !round.qs || idx < 0 || idx >= round.qs.length) return;
+  const q = round.qs[idx];
+  document.getElementById('farher-schema').innerHTML = `<strong style="color:var(--gold-dim)">Schema:</strong> ${q.schema}`;
+  document.getElementById('farher-task').innerHTML = q.task;
+  document.getElementById('farher-query-input').value = '';
+  document.getElementById('farher-result-msg').textContent = '';
+  const hintBtn = document.getElementById('farher-hint-btn');
+  if (hintBtn) hintBtn.style.display = q.hint ? 'inline-block' : 'none';
+  const hintBox = document.getElementById('farher-hint-box');
+  if (hintBox) { hintBox.style.display = 'none'; hintBox.textContent = ''; }
+  document.getElementById('farher-query-input').focus();
+}
+function updateTimerRing(current, max) {
+  const circumference = 251.2;
+  const offset = circumference * (1 - current / max);
+  const ring = document.getElementById('farher-timer-ring');
+  const num = document.getElementById('farher-timer-num');
+  ring.style.strokeDashoffset = offset;
+  num.textContent = current;
+  if (current > 60) { ring.style.stroke = '#60e0a0'; num.classList.remove('danger'); }
+  else if (current > 25) { ring.style.stroke = '#7aaeff'; num.classList.remove('danger'); }
+  else { ring.style.stroke = '#e06070'; num.classList.add('danger'); }
+}
+function submitFarherQuery() {
+  const roundKey = farherLastRoundKey;
+  const round = FARHER_ROUNDS[roundKey];
+  if (!round) return;
+  if (farherQIndex >= round.qs.length) return;
+  const query = document.getElementById('farher-query-input').value.trim();
+  if (!query || !db) return;
+  const runBtn = document.querySelector('#farher-question-box .btn-primary');
+  if (runBtn) runBtn.disabled = true;
+  const enableRunBtn = () => { if (runBtn) runBtn.disabled = false; };
+  try {
+    const stmt = db.exec(query);
+    const q = round.qs[farherQIndex];
+    const expectedRows = JSON.parse(q.expectedResult);
+    let userRows = [];
+    if (stmt.length > 0 && stmt[0].values.length > 0) {
+      const columns = stmt[0].columns;
+      userRows = stmt[0].values.map(row => { const obj = {}; columns.forEach((c,i) => obj[c] = row[i]); return obj; });
+    }
+    const dot = document.getElementById('fqd-' + farherQIndex);
+    if (compareSqlResults(userRows, expectedRows)) {
+      if (dot) { dot.classList.remove('active'); dot.classList.add('passed'); }
+      farherPassed[farherQIndex] = true;
+      document.getElementById('farher-result-msg').textContent = '✅ Correct! Moving to next...';
+      document.getElementById('farher-result-msg').className = 'farher-result-msg ok';
+      farherQIndex++;
+      if (farherQIndex >= round.qs.length) {
+        clearInterval(farherTimerInterval);
+        setTimeout(() => endFarher(roundKey, true, round.passText), 800);
+      } else {
+        const nextDot = document.getElementById('fqd-' + farherQIndex);
+        if (nextDot) nextDot.classList.add('active');
+        setTimeout(() => { loadFarherQuestion(round, farherQIndex); enableRunBtn(); }, 900);
+      }
+    } else {
+      if (dot) { dot.classList.remove('active'); dot.classList.add('failed'); }
+      document.getElementById('farher-result-msg').textContent = '❌ Incorrect. Moving on...';
+      document.getElementById('farher-result-msg').className = 'farher-result-msg bad';
+      farherQIndex++;
+      if (farherQIndex >= round.qs.length) {
+        clearInterval(farherTimerInterval);
+        const allPassed = farherPassed.every(Boolean);
+        setTimeout(() => endFarher(roundKey, allPassed, allPassed ? round.passText : round.failText), 800);
+      } else {
+        const nextDot = document.getElementById('fqd-' + farherQIndex);
+        if (nextDot) nextDot.classList.add('active');
+        setTimeout(() => { loadFarherQuestion(round, farherQIndex); enableRunBtn(); }, 900);
+      }
+    }
+  } catch(e) {
+    document.getElementById('farher-result-msg').textContent = `SQL Error: ${e.message}`;
+    document.getElementById('farher-result-msg').className = 'farher-result-msg bad';
+    enableRunBtn();
+  }
+}
+function useFarherHint() {
+  const roundKey = farherLastRoundKey;
+  const round = FARHER_ROUNDS[roundKey];
+  if (!round || farherQIndex >= round.qs.length) return;
+  const q = round.qs[farherQIndex];
+  if (!q.hint) return;
+  farherTimeLeft = Math.max(0, farherTimeLeft - 15);
+  const hintBox = document.getElementById('farher-hint-box');
+  if (hintBox) { hintBox.innerHTML = q.hint; hintBox.style.display = 'block'; }
+  const hintBtn = document.getElementById('farher-hint-btn');
+  if (hintBtn) hintBtn.style.display = 'none';
+}
+function endFarher(roundKey, passed, text) {
+  clearInterval(farherTimerInterval);
+  chaptersCompleted.push('farher_' + roundKey);
+  const outcome = document.getElementById('farher-outcome');
+  const questionBox = document.getElementById('farher-question-box');
+  if (questionBox) questionBox.style.display = 'none';
+  outcome.classList.add('active');
+  outcome.classList.add(passed ? 'pass' : 'fail');
+  document.getElementById('farher-outcome-title').textContent = passed ? '🎓 Yashar Koach!' : 'Keep Learning!';
+  document.getElementById('farher-outcome-text').textContent = text;
+  const continueAnywayBtn = document.getElementById('farher-continue-anyway-btn');
+  if (!passed && continueAnywayBtn) continueAnywayBtn.style.display = 'inline-block';
+  if (passed) addXP(FARHER_ROUNDS[roundKey].passReward);
+}
+function closeFarher() {
+  document.getElementById('farher-modal').classList.remove('active');
+  farherActive = false;
+  clearInterval(farherTimerInterval);
+  if (farherPendingNext === 'END') { doChapterTransition('סיום מסכת!', showSiyum); }
+  else { doChapterTransition(chapters[farherPendingNext]?.title || 'Next Perek', () => loadChapter(farherPendingNext)); }
+}
+
+// ===================================================================
+// FARHER SEED TABLES
+// ===================================================================
+function seedFarherTables() {
+  try {
+    // Farher tables already use Authors + Scrolls — no extra tables needed for Level 2
+  } catch(e) { /* ignore */ }
+}
+
+// ===================================================================
+// UTILITIES
+// ===================================================================
+function getRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ===================================================================
+// GATE VALIDATION — Code from Level 1 siyum is 7392
+// ===================================================================
+function validateGate() {
+  const input = document.getElementById('gate-code-input').value.trim();
+  const errorMsg = document.getElementById('gate-error-msg');
+  const gateCard = document.getElementById('gate-card');
+  if (input === '7392') {
+    errorMsg.textContent = '';
+    document.getElementById('level-gate').classList.add('unlocked');
+    setTimeout(() => {
+      updateArchiveScrolls();
+      setAvatarExpression('neutral');
+    }, 600);
+  } else {
+    errorMsg.textContent = 'The gates remain barred. Complete Level I to find the passage code.';
+    gateCard.classList.remove('shake');
+    void gateCard.offsetWidth;
+    gateCard.classList.add('shake');
+  }
+}
+
+// ===================================================================
+// ARCHIVE SVG — Scroll glow system (replaces Beis Medrash windows)
+// ===================================================================
+const ARC_SCROLL_COUNT = 6;
+let arcBaseOpacities = [0,0,0,0,0,0];
+
+function updateArchiveScrolls() {
+  const maxXP = 1000;
+  const ratio = Math.min(xp / maxXP, 1);
+  const litCount = Math.ceil(ratio * ARC_SCROLL_COUNT);
+  const brightness = 0.3 + ratio * 0.7;
+  for (let i = 0; i < ARC_SCROLL_COUNT; i++) {
+    const el = document.getElementById('arcw-' + i);
+    if (!el) continue;
+    if (i < litCount) {
+      arcBaseOpacities[i] = brightness;
+      el.setAttribute('opacity', brightness.toFixed(2));
+    } else {
+      arcBaseOpacities[i] = 0;
+      el.setAttribute('opacity', '0');
+    }
+  }
+  const flame = document.getElementById('arc-flame');
+  if (flame) {
+    const r = 3 + ratio * 4;
+    flame.setAttribute('r', r.toFixed(1));
+    flame.setAttribute('opacity', (0.7 + ratio * 0.3).toFixed(2));
+  }
+  const aura = document.getElementById('av-aura');
+  if (aura) aura.setAttribute('opacity', ratio > 0.6 ? ((ratio - 0.6) * 2.0).toFixed(2) : '0');
+}
+
+// ===================================================================
+// SVG AVATAR — Expression System
+// ===================================================================
+const AVATAR_EXPRESSIONS = ['neutral','happy','sad','thinking'];
+const AVATAR_MOODS = {
+  neutral:  'Ready to pasken...',
+  happy:    'Yashar koach! 🎉',
+  sad:      'Oy... try again.',
+  thinking: 'Hmm, interesting...'
+};
+function setAvatarExpression(expr) {
+  AVATAR_EXPRESSIONS.forEach(e => {
+    const eyesEl  = document.getElementById('av-eyes-' + e);
+    const mouthEl = document.getElementById('av-mouth-' + e);
+    if (eyesEl)  eyesEl.setAttribute('visibility', 'hidden');
+    if (mouthEl) mouthEl.setAttribute('visibility', 'hidden');
+  });
+  const eyesEl  = document.getElementById('av-eyes-' + expr);
+  const mouthEl = document.getElementById('av-mouth-' + expr);
+  if (eyesEl)  eyesEl.setAttribute('visibility', 'visible');
+  if (mouthEl) mouthEl.setAttribute('visibility', 'visible');
+  const moodEl = document.getElementById('avatar-mood');
+  if (moodEl) moodEl.textContent = AVATAR_MOODS[expr] || '';
+  const svg = document.getElementById('rosh-chabura-svg');
+  if (svg) {
+    svg.style.transform = expr === 'happy' ? 'scale(1.08) rotate(-2deg)' :
+                          expr === 'sad'   ? 'scale(0.95) rotate(1deg)'  :
+                          expr === 'thinking' ? 'scale(1.02) rotate(3deg)' : 'scale(1)';
+    svg.style.transition = 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)';
+    setTimeout(() => { svg.style.transform = 'scale(1) rotate(0deg)'; }, 600);
+  }
+}
+
+// Soundscape stub (no audio for Level 2 — can be extended)
+let soundscapeOn = false;
+function toggleSoundscape() { /* reserved for future audio */ }
+
+// ===================================================================
+// BOOT
+// ===================================================================
+window.onload = initDB;
+</script>
+</body>
+</html>

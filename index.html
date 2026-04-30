@@ -795,6 +795,48 @@ body {
 .btn-reveal:hover { background: rgba(139,26,26,0.5); }
 
 /* ============ SIYUM SCREEN ============ */
+#completion-code-container {
+  margin: 20px auto 30px;
+  padding: 20px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid var(--gold-dim);
+  border-radius: 8px;
+  max-width: 450px;
+}
+.code-reveal-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 15px;
+}
+#secret-code-display {
+  font-family: 'Courier Prime', monospace;
+  font-size: 1.6em;
+  color: var(--gold-bright);
+  letter-spacing: 4px;
+  padding: 8px 20px;
+  background: var(--terminal-bg);
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  font-weight: bold;
+}
+.btn-copy {
+  background: rgba(204,163,0,0.1);
+  color: var(--gold);
+  border: 1px solid var(--gold-dim);
+  padding: 10px 14px;
+  font-family: 'IM Fell English', serif;
+  font-size: 1em;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+.btn-copy:hover {
+  background: rgba(204,163,0,0.3);
+  color: var(--gold-bright);
+}
+
 #screen-siyum {
   display: flex;
   align-items: center;
@@ -1731,17 +1773,21 @@ body {
     <div class="screen" id="screen-siyum">
       <div class="siyum-card">
         <h1>🎉 MAZEL TOV! SIYUM MASECHES SQL! 🎉</h1>
-        <svg width="90" height="90" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" style="margin:20px auto;display:block;">
-          <rect x="10" y="10" width="80" height="80" fill="none" stroke="#cca300" stroke-width="5" rx="4"/>
-          <rect x="20" y="20" width="60" height="60" fill="#2a1d10"/>
-          <text x="50" y="58" font-family="Georgia" font-size="28" fill="#cca300" text-anchor="middle" font-weight="bold">סיום</text>
-        </svg>
-        <p>
-          <em>Hadran Alach, Beis Medrash!</em> You have successfully written the queries, saved the bochurim from the klipos of bitul zman, and restored harmony to the Yeshiva. The Mashgiach is beaming, the Kol Torah is deafening, and there is extra potato kugel in the dining room in your honor.
-          <br><br>
-          <strong>Ashreicha! Talmud Torah K'neged Kulam!</strong>
-        </p>
-        <button class="btn btn-start" onclick="location.reload()">Start a New Zman (Play Again)</button>
+        
+        <div id="completion-code-container">
+          <button id="reveal-code-btn" class="btn btn-hint" style="font-size: 1.1em; padding: 12px 24px;" onclick="revealSecretCode()">🗝️ Reveal Secret Passage Code</button>
+          
+          <div id="secret-code-wrap" class="code-reveal-area" style="display: none;">
+            <div id="secret-code-display">7392</div>
+            <button id="copy-code-btn" class="btn-copy" onclick="copySecretCode()">Copy</button>
+          </div>
+        </div>
+
+        <button onclick="finishGameAndGoToLevel2()" class="btn btn-start" style="background: #0d1530; color: #7aaeff; border: 2px solid #7aaeff; margin-bottom: 10px;">
+           📜 Enter Level II: The Archives
+        </button>
+
+        <button class="btn" style="background:transparent; border:none; color:var(--gold); text-decoration:underline;" onclick="location.reload()">Start a New Zman (Play Again)</button>
       </div>
     </div>
 
@@ -2501,6 +2547,33 @@ function showSiyum() {
   if (typeof beisMediashFlash === 'function') beisMediashFlash();
 }
 
+function revealSecretCode() {
+  document.getElementById('reveal-code-btn').style.display = 'none';
+  document.getElementById('secret-code-wrap').style.display = 'flex';
+}
+
+function copySecretCode() {
+  const codeText = document.getElementById('secret-code-display').innerText;
+  navigator.clipboard.writeText(codeText).then(() => {
+    const copyBtn = document.getElementById('copy-code-btn');
+    copyBtn.textContent = 'Copied!';
+    setTimeout(() => {
+      copyBtn.textContent = 'Copy';
+    }, 2000);
+  });
+}
+
+
+function finishGameAndGoToLevel2() {
+    // Save progress to localStorage
+    localStorage.setItem('sql_game_captainName', captainName);
+    localStorage.setItem('sql_game_avatar', avatar);
+    localStorage.setItem('sql_game_xp', xp);
+
+    // Redirect to the second file
+    // IMPORTANT: Make sure this filename matches your Level 2 file exactly
+    window.location.href = 'SQL_game_YESHIVA_NUMBER_2_v2.html';
+}
 // ===================================================================
 // ROBUST SQL RESULT COMPARISON
 // Compares two result arrays (objects) ignoring row order and column order.
