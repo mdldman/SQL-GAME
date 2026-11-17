@@ -1,61 +1,44 @@
-## [Click Here to Play the Game!](https://mdldman.github.io/SQL-GAME/index.html)
+# Lost in the Beis Medrash: SQL Seder (v3)
 
-# SQL-GAME
-Step into Lost in the Beis Medrash: SQL Seder, an immersive educational RPG. As a Mashgiach, you must restore order to a chaotic Yeshiva database by writing SQL queries to track attendance, pair chavrusas, and manage students. Featuring a parchment-themed terminal, XP progression, + branching narrative paths, it blends Torah with database mastery.
+## [Click here to play](https://mdldman.github.io/SQL-GAME/index.html)
 
-# 📜 Lost in the Beis Medrash: SQL Seder
+A yeshiva-themed game that **teaches** SQL. As the new **Gabbai HaData** of Yeshivas Sha'arei Seder of Baltimore,
+you write real SQL queries to repair the scrambled Mesorah DB — and decide how the story of the Golem of Gigabytes ends.
 
-**Lost in the Beis Medrash: SQL Seder** is an immersive educational RPG designed to teach SQL database management through a unique narrative lens. 
+- **61 levels** in 6 acts, from a first `SELECT` to window functions and recursive queries
+- **A tutor in every level:** Shiur (watch the query run row by row), Kasha (predict the result), Chavrusa (guided steps),
+  Shaila (the task) and Pshat (why it works, plus a bonus "solve it another way")
+- Feedback that names the mistake, **Explain my query**, **How SQL ran this**, and a row comparison after three tries
+- **Chazara** review rounds, a skills shelf, **28 achievements**, and the **Daf SQL** — one daily puzzle, the same for the whole class
+- **Your own character:** name, shiur, dorm and room (you appear in the tables!), and an avatar with earnable accessories
+- **Choose-your-own-ending story:** 14 choices, 11 endings (some very secret), and the Genizah Attic — a loop you can get stuck in
+- **Music:** original instrumental niggunim composed live in the browser; silent during Sefira and the Three Weeks
+- **4 farhers**, a finale, and 26 hidden secrets (*sodos*)
+- Progress saves automatically in the browser; progress codes move it between computers
 
-As a **Mashgiach**, you must restore order to a chaotic Yeshiva database by writing SQL queries to track attendance, pair chavrusas, and manage students. Blending Torah learning with database mastery, the game features a parchment-themed terminal, XP progression, and branching narrative paths.
+## How to play
 
----
+Open `index.html` in any modern browser (Chrome, Edge, Firefox, Safari), on a computer or a phone.
+Nothing to install; it works offline once loaded. Read the story, check the tables, write your query, press
+**Paskan query** (or Ctrl/⌘+Enter). Tab completes table and column names; Ctrl+↑ brings back earlier queries.
 
-## 🕹️ Game Features
+## Files
 
-* **SQL Terminal Interface:** Write and execute real SQL queries against an in-memory SQLite database.
-* **Narrative Driven:** Solve challenges based on real-world Yeshiva scenarios (Attendance, Sefarim inventory, Chavrusa matching).
-* **XP & Progression:** Earn experience points for correct queries and unlock new ranks.
-* **Visual Atmosphere:** A custom-styled UI featuring "Aged Parchment" aesthetics and custom SVG animations.
-* **The Chain-Link System:** Complete Level 1 to uncover a secret 4-digit code required to unlock Level 2.
+| File | What it is |
+|---|---|
+| `index.html` | The whole game in one file (the SQL engine and the music are built in) |
+| `SQL_game_YESHIVA_NUMBER_2_v2.html` | Forwards old Level II links to the new game |
+| `README.md` | This page |
 
----
+## For teachers
 
-## 🛠️ Tech Stack
+**Teacher mode** opens every level and farher, lets you show answers, turns off farher timers, and can release a student
+from the Genizah Attic. Choose *Teacher* on the title screen and enter the teacher code from your teacher sheet.
 
-* **Engine:** HTML5, CSS3, Vanilla JavaScript.
-* **Database:** [sql.js](https://github.com/sql-js/sql.js) (SQLite compiled to WebAssembly).
-* **Typography:** Google Fonts (IM Fell English, Cinzel Decorative, Courier Prime).
+**Farher timers for a whole class:** share the link `index.html?timers=off` (or `?timers=on`).
 
----
+**Passage codes** (one per act, on the teacher sheet) let a student start from a later act on another computer.
+Students can also copy a **progress code** from Settings and paste it on another computer.
+Progress from the earlier version of the game carries over automatically.
 
-## 🚀 How to Play
-
-1.  **Download** the `Mr_Lebovic_SQL_game.html` file.
-2.  **Open** the file in any modern web browser (Chrome, Firefox, Edge).
-3.  **Read the Story:** Follow the prompts from the Rosh Yeshiva or Mashgiach.
-4.  **Solve Queries:** Use the SQL input box to satisfy the requirements of each level.
-5.  **Advance:** Once you complete the final challenge, click **"Uncover the code for Level 2"**.
-6.  **Progress:** Copy the code and paste it into the Level 2 HTML file to continue your journey.
-
----
-
-## 📂 Project Structure
-
-* `Level-1.html`: The introductory module covering basic `SELECT`, `WHERE`, and `ORDER BY`.
-* `Level-2.html`: Advanced filtering and basic `JOIN` operations (Requires Level 1 unlock code).
-* `assets/`: (Embedded) All CSS and JS are bundled within the HTML for easy "plug-and-play" portability.
-
----
-
-## 🎓 Educational Goals
-
-This game is designed to take a student from zero SQL knowledge to being comfortable with:
-* Filtering data with `WHERE` clauses.
-* Sorting results with `ORDER BY`.
-* Aggregating data (COUNT, SUM).
-* Understanding relational database structures.
-
----
-
-*“Ben Bag Bag says: Turn it over and turn it over, for everything is in it...” — Including the database.*
+*"Hafoch ba v'hafoch ba, d'kula ba" — turn it over and over, for everything is in it. Including the database.*
