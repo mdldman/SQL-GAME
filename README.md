@@ -1,4 +1,4 @@
-# Lost in the Beis Medrash: SQL Seder (v3)
+# Lost in the Beis Medrash: SQL Seder (v3.1)
 
 ## [Click here to play](https://mdldman.github.io/SQL-GAME/index.html)
 
@@ -15,6 +15,18 @@ you write real SQL queries to repair the scrambled Mesorah DB — and decide how
 - **Music:** original instrumental niggunim composed live in the browser; silent during Sefira and the Three Weeks
 - **4 farhers**, a finale, and 26 hidden secrets (*sodos*)
 - Progress saves automatically in the browser; progress codes move it between computers
+
+### New in v3.2
+- **Reb Tuvia on screen:** the Maggid Shiur stands at his shtender beside a blackboard. He sways as he learns, writes each query in chalk, points at the board while the rows fall away, asks a kasha with his thumb, and his mouth moves when he speaks
+- **Ask Reb Tuvia** (🙋 on every screen): type a shaila about SQL or the level you're on and he answers in a speech bubble, with 🔊 to hear it. Works offline. He helps you think; he won't just hand over the answer
+- A more lifelike, shaded avatar
+
+### New in v3.1 (from student feedback)
+- **Reb Tuvia Lichtman, the Maggid Shiur**, gives the shiur in every level, with a 🔊 button to hear him and the other characters
+- Clearer setup messages, right under the box that needs fixing; real family names like Heller are no longer blocked
+- The Kasha shows the table it asks about; the Echad Mi Yodea box takes `12` or `twelve`
+- Wardrobe: hats that fit, a black velvet yarmulke and no-hat option, shorter peyos, beards, and riddles you can answer
+- **Report a problem** button that copies everything your teacher needs, ready to paste into the class forum
 
 ## How to play
 
