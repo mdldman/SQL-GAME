@@ -1,4 +1,4 @@
-# Lost in the Beis Medrash: SQL Seder (v3.1)
+# Lost in the Beis Medrash: SQL Seder (v3.2)
 
 ## [Click here to play](https://mdldman.github.io/SQL-GAME/index.html)
 
