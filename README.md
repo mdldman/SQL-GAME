@@ -1,4 +1,4 @@
-# Lost in the Beis Medrash: SQL Seder (v3.2)
+# Lost in the Beis Medrash: SQL Seder (v3.3)
 
 ## [Click here to play](https://mdldman.github.io/SQL-GAME/index.html)
 
@@ -12,9 +12,17 @@ you write real SQL queries to repair the scrambled Mesorah DB — and decide how
 - **Chazara** review rounds, a skills shelf, **28 achievements**, and the **Daf SQL** — one daily puzzle, the same for the whole class
 - **Your own character:** name, shiur, dorm and room (you appear in the tables!), and an avatar with earnable accessories
 - **Choose-your-own-ending story:** 14 choices, 11 endings (some very secret), and the Genizah Attic — a loop you can get stuck in
-- **Music:** original instrumental niggunim composed live in the browser; silent during Sefira and the Three Weeks
+- **Music:** original niggunim composed live in the browser — instruments or male voices (yai-dai-dai); silent during Sefira and the Three Weeks
+- **The Canteen:** spend your XP on niggunim, voices, sound effects and wardrobe items (your madreiga never goes down)
 - **4 farhers**, a finale, and 26 hidden secrets (*sodos*)
 - Progress saves automatically in the browser; progress codes move it between computers
+
+### New in v3.3 (from student feedback)
+- **Same name, same progress:** every bochur who plays on a computer keeps his own save. Type your name again and you continue right where you stopped; *Not you? Sign in* lists everyone on that computer. A new bochur no longer erases the last one
+- **Wardrobe:** beard colours, six haircuts, bigger yarmulkes (three sizes), and tzitzis that hang from the waist instead of a pocket
+- **More yeshivish:** shkoyach, yasher koach, nu, a remez — all over the buttons and messages
+- **Music:** three new moods (Zemiros, Dveikus, Motzei Shabbos), eight named niggunim, and two male voices — a Chazzan and a bochurim choir — singing wordless niggun syllables
+- **The Canteen 🛒:** spend XP on niggunim, voices, sound packs (shul bell, kapelye clarinet, the bochurim sing it) and wardrobe items; finishing acts earns some music for free
 
 ### New in v3.2
 - **Reb Tuvia on screen:** the Maggid Shiur stands at his shtender beside a blackboard. He sways as he learns, writes each query in chalk, points at the board while the rows fall away, asks a kasha with his thumb, and his mouth moves when he speaks

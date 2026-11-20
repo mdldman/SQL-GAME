@@ -687,6 +687,28 @@ body.reduce-motion .rebbi, body.reduce-motion .rebbi * { animation: none !import
 .scene-face.has-rebbi .rebbi, .scene-face.has-rebbi .rebbi svg { width: 124px; }
 @media (max-width: 760px) { .scene-face.has-rebbi, .scene-face.has-rebbi .rebbi, .scene-face.has-rebbi .rebbi svg { width: 84px; } }
 
+/* v3.3 — saves per bochur */
+.profile-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.profile-row { display: flex; gap: 6px; align-items: stretch; }
+.profile-pick { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.btn small { opacity: .8; font-size: .8em; }
+.warn-box { background: rgba(204, 140, 0, .14); border: 1px solid rgba(204, 140, 0, .5); border-radius: 8px; padding: 8px 10px; margin: 10px auto; max-width: 560px; }
+
+/* v3.3 — the Canteen */
+.spend-row { width: 100%; margin-top: 6px; font-size: .82rem; white-space: nowrap; gap: 6px; align-items: center; background: rgba(204,163,0,.1); border: 1px solid rgba(204,163,0,.35); border-radius: 6px; padding: 4px 8px; color: inherit; font-family: inherit; cursor: pointer; display: flex; justify-content: space-between; }
+.spend-row:hover { background: rgba(204,163,0,.2); }
+.ct-wallet { font-size: 1.05rem; }
+.ct-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; margin-top: 8px; }
+.ct-item { display: flex; gap: 10px; align-items: center; padding: 8px; border: 1px solid rgba(204,163,0,.3); border-radius: 8px; background: rgba(0,0,0,.18); min-width: 0; }
+.ct-item.owned { border-color: rgba(120,190,120,.5); }
+.ct-ico { font-size: 1.8rem; width: 44px; text-align: center; flex: none; }
+.ct-thumb { flex: none; width: 64px; }
+.ct-main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ct-act { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; flex: none; }
+.ct-own { color: #9bd59b; font-weight: bold; }
+.ct-earn { color: var(--gold-b); }
+@media (max-width: 480px) { .ct-grid { grid-template-columns: 1fr; } }
+
 </style>
 </head>
 <body>
@@ -10585,9 +10607,56 @@ body.golem-growl::after {
     pop() { const m = master(0.15); note(m, 'sine', 660, 0, 0.12, 0.4, 990); },
   };
 
+  /* ---------- v3.3 sound packs (bought in the Canteen): they replace clink / sigh / fanfare ---------- */
+  const VW = { a: [730, 1090, 2440], i: [300, 2200, 2950], o: [570, 840, 2410], m: [260, 1100, 2300] };
+  function sung(out, freq, t0, dur, v1, v2, gain, onset) { // a tiny formant voice: "yai", "bam", "oy"
+    const c = ac(), T = c.currentTime + t0;
+    const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(freq, T);
+    const o2 = c.createOscillator(); o2.type = 'sawtooth'; o2.frequency.setValueAtTime(freq * 0.5, T); o2.detune.value = 4;
+    const mixg = c.createGain(); mixg.gain.value = 1; o.connect(mixg); const g2 = c.createGain(); g2.gain.value = 0.4; o2.connect(g2); g2.connect(mixg);
+    const env = c.createGain(); env.gain.setValueAtTime(0.0001, T); env.gain.linearRampToValueAtTime(gain, T + (onset || 0.03)); env.gain.setValueAtTime(gain, T + dur * 0.75); env.gain.exponentialRampToValueAtTime(0.001, T + dur);
+    [0, 1, 2].forEach(k => {
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = [6, 11, 16][k];
+      bp.frequency.setValueAtTime(VW[v1][k], T); if (v2) bp.frequency.linearRampToValueAtTime(VW[v2][k], T + dur * 0.9);
+      const g = c.createGain(); g.gain.value = [2.2, 1.4, 0.8][k]; mixg.connect(bp); bp.connect(g); g.connect(env);
+    });
+    env.connect(out); [o, o2].forEach(x => { x.start(T); x.stop(T + dur + 0.05); });
+  }
+  function bell(out, f, t0, gain) { [[1, 1], [2.76, .5], [5.4, .25], [8.9, .12]].forEach(([m, a]) => note(out, 'sine', f * m, t0, 1.8 / m + .2, gain * a)); }
+  const PACKS = {
+    classic: {},
+    shul: { // the shul bell and the shofar
+      clink() { const m = master(0.28); bell(m, 880, 0, .5); bell(m, 1318, .14, .35); },
+      sigh() { const m = master(0.22); bell(m, 330, 0, .5); },
+      fanfare() { sounds.shofar(); setTimeout(() => { if (Sound.enabled) { const m = master(0.2); [0, .16, .32].forEach(t => note(m, 'sawtooth', 311, t, .12, .3, 330)); } }, 1700); },
+    },
+    kapelye: { // a klezmer clarinet
+      clink() { const m = master(0.2); [587, 698, 784, 880, 784, 880].forEach((f, i) => note(m, 'square', f, i * .07, .12, .22)); },
+      sigh() { const m = master(0.18); note(m, 'square', 440, 0, .5, .25, 466); note(m, 'square', 466, .45, .7, .22, 415); },
+      fanfare() { const m = master(0.2); [587, 622, 740, 784, 880, 784, 740, 622, 587, 880, 1175].forEach((f, i) => note(m, 'square', f, i * .09, .14, .22)); },
+    },
+    bochurim: { // the bochurim sing it: "yai-dai-dai!" / "oy" / "ya-ba-ba-bam!"
+      clink() { const m = master(0.35); sung(m, 196, 0, .2, 'i', 'a', .5); sung(m, 220, .2, .2, 'a', 'i', .5, .02); sung(m, 262, .4, .45, 'a', 'i', .55, .02); },
+      sigh() { const m = master(0.32); sung(m, 196, 0, .8, 'o', 'i', .5, .08); },
+      fanfare() { const m = master(0.35); [[196, 'i', 'a'], [247, 'a', null], [294, 'a', null], [392, 'a', 'm']].forEach((n, i) => sung(m, n[0], i * .22, i === 3 ? .7 : .2, n[1], n[2], .55, .02)); },
+    },
+  };
+  Sound.packs = [
+    { id: 'classic', label: 'Classic (tea-glass clink)' },
+    { id: 'shul', label: 'Shul bell & shofar' },
+    { id: 'kapelye', label: 'Kapelye clarinet' },
+    { id: 'bochurim', label: 'The bochurim sing it' },
+  ];
+  Sound.pack = 'classic';
+  Sound.setPack = function (id) { Sound.pack = PACKS[id] ? id : 'classic'; };
+
   Sound.play = function (name) {
-    if (!Sound.enabled || !sounds[name]) return;
-    try { if (ac()) sounds[name](); } catch (e) { /* audio is optional */ }
+    if (!Sound.enabled) return;
+    // musical packs fall back to the plain effects during Sefira and the Three Weeks
+    let quiet = false; try { quiet = !!(G.SQLGMusic && G.SQLGMusic.silencedReason && G.SQLGMusic.silencedReason()); } catch (e) {}
+    const pk = (quiet && (Sound.pack === 'kapelye' || Sound.pack === 'bochurim') ? {} : PACKS[Sound.pack]) || {}, fn = pk[name] || sounds[name];
+    if (!fn) return;
+    try { if (ac()) fn(); } catch (e) { /* audio is optional */ }
   };
 
   Sound.startHum = function () {
@@ -10621,7 +10690,11 @@ body.golem-growl::after {
 /* ---- src/ui/music.js ---- */
 /* ==================================================================
    SQL SEDER v3 — generative instrumental music (global SQLGMusic)
-   Web Audio only: no files, no samples, no vocals. Every tune is composed
+   Web Audio only: no files, no samples, no recordings.
+   v3.3 (teacher's decision, from student feedback): male voices are allowed. Two synthesised
+   voices sing wordless niggun syllables ("yai", "dai", "bam", "oy"): a solo Chazzan and a choir
+   of bochurim. Named niggunim (TRACKS) are fixed melodies, the same every time you play them —
+   all original compositions in the traditional modes (no modern composer's tune is reproduced). Every tune is composed
    on the fly in three Jewish modes — Ahava Rabba (freygish), Mi Sheberach
    (Ukrainian Dorian) and Adonai Malach — with nigun phrasing: a phrase,
    its repeat with a new ending, a higher second part, its repeat.
@@ -10644,9 +10717,25 @@ body.golem-growl::after {
     { id: 'simcha', label: 'Simcha', desc: 'A fast freilach — clarinet in front, the whole kapelye dancing.' },
     { id: 'farher', label: 'Farher', desc: 'A tense pulse that quickens as the clock runs down.' },
     { id: 'genizah', label: 'Genizah', desc: 'Eerie and unresolved — one held note in the dust.' },
+    // v3.3
+    { id: 'zemiros', label: 'Zemiros', desc: 'Around the Shabbos table — a steady, singable zemer.' },
+    { id: 'dveikus', label: 'Dveikus', desc: 'Very slow and longing. One note can take a whole breath.' },
+    { id: 'motzei', label: 'Motzei Shabbos', desc: 'Bittersweet — Shabbos is leaving, the week begins.' },
+  ];
+  // Named niggunim: fixed melodies (a seeded composition that never changes), each in the style of a mood.
+  const TRACKS = [
+    { id: 't_gabbai',   label: 'Niggun HaGabbai',          style: 'kumzitz', seed: 5786, desc: 'The theme of the Gabbai HaData — the one the whole yeshiva hums.' },
+    { id: 't_shtender', label: 'Niggun of the Shtender',   style: 'dveikus', seed: 613,  desc: 'Slow, for the last hour of night seder.' },
+    { id: 't_cholent',  label: 'Freilach of the Cholent Pot', style: 'simcha', seed: 1818, desc: 'Fast enough to stir the cholent by itself.' },
+    { id: 't_zemer',    label: 'Zemer for Friday Night',   style: 'zemiros', seed: 248,  desc: 'Steady and warm — for after the fish.' },
+    { id: 't_havdala',  label: 'Havdala Niggun',           style: 'motzei',  seed: 365,  desc: 'Candle, besamim, and a new week.' },
+    { id: 't_golem',    label: 'The Golem\'s Lament',       style: 'genizah', seed: 18,   desc: 'What the Golem hums in the attic. Minor, and a little lonely.' },
+    { id: 't_siyum',    label: 'Siyum March',              style: 'simcha',  seed: 2711, desc: 'For dancing around the bima after a siyum.' },
+    { id: 't_kumzitz',  label: 'Kumzitz at Bein Hazmanim', style: 'kumzitz', seed: 54,   desc: 'Guitar, a campfire, and Moishy still hasn\'t left Baltimore.' },
   ];
   const MOOD_IDS = MOODS.map(m => m.id);
-  const INSTRUMENTS = ['strings', 'clarinet', 'violin', 'ensemble'];
+  const INSTRUMENTS = ['strings', 'clarinet', 'violin', 'ensemble', 'chazzan', 'choir'];
+  const VOICES = ['chazzan', 'choir']; // sung (male voices), v3.3
   const TEMPO = { calm: 0.82, normal: 1, lively: 1.18 };
   const MIX_IN = 0.5, TRIM = 0.4; // gain staging around the master compressor
 
@@ -10709,7 +10798,27 @@ body.golem-growl::after {
       cadence: [[8], [-4, 4]], orn: { krechts: 0.2, grace: 0.05, scoop: 0.3, trill: 0, mordent: 0 },
       leadVel: 0.26, verb: 0.6, unresolved: true, level: 1,
     },
+    zemiros: {
+      bpm: 92, spb: 8, modes: ['adonai', 'minor', 'misheberach'], tonics: [62, 60, 64], center: 2, span: [-3, 7], style: 'kumzitz',
+      rhythms: [[2, 2, 2, 2], [3, 1, 2, 2], [2, 2, 4], [4, 2, 2], [2, 1, 1, 4], [6, 2]],
+      cadence: [[4, 4], [2, 2, 4], [8]], orn: { krechts: 0.1, grace: 0.12, scoop: 0.12, trill: 0.02, mordent: 0.08 },
+      leadVel: 0.27, verb: 0.26, level: 0.88,
+    },
+    dveikus: {
+      bpm: 52, spb: 8, modes: ['freygish', 'minor', 'misheberach'], tonics: [62, 64, 60], center: 3, span: [-2, 8], style: 'beis',
+      rhythms: [[6, 2], [4, 4], [8], [2, 6], [3, 1, 4], [4, 2, 2]],
+      cadence: [[8], [6, 2], [4, 4]], orn: { krechts: 0.45, grace: 0.1, scoop: 0.25, trill: 0.05, mordent: 0 },
+      leadVel: 0.30, verb: 0.45, level: 0.82,
+    },
+    motzei: {
+      bpm: 70, spb: 8, modes: ['minor', 'misheberach'], tonics: [62, 64, 57 + 12], center: 2, span: [-3, 6], style: 'kumzitz',
+      rhythms: [[3, 1, 4], [2, 2, 4], [4, 4], [2, 2, 2, 2], [6, 2]],
+      cadence: [[8], [4, 4]], orn: { krechts: 0.3, grace: 0.1, scoop: 0.2, trill: 0, mordent: 0.04 },
+      leadVel: 0.26, verb: 0.34, level: 0.84,
+    },
   };
+  // a named niggun = its style's definition + a fixed seed (same melody, same key, every time)
+  TRACKS.forEach(tr => { DEF[tr.id] = Object.assign({}, DEF[tr.style], { fixed: tr.seed, style: DEF[tr.style].style || tr.style, track: true }); });
 
   /* ---------------- composer: nigun form A A' B B' ---------------- */
   function makeTune(r, def, festive) {
@@ -10864,7 +10973,89 @@ body.golem-growl::after {
     return hold + rel;
   };
 
-  E.lead = function (L, t, midi, dur, vel, orn, voice, upperMidi) {
+  /* ---------- sung voices (v3.3): source -> formant filters, wordless niggun syllables ---------- */
+  // male formants (Hz) and relative levels per vowel
+  const VOWEL = {
+    a: [[730, 1090, 2440], [1, 0.5, 0.22]],
+    i: [[300, 2200, 2950], [1, 0.22, 0.16]],
+    o: [[570, 840, 2410], [1, 0.45, 0.16]],
+    u: [[320, 870, 2240], [1, 0.3, 0.1]],
+    e: [[530, 1840, 2480], [1, 0.4, 0.2]],
+    m: [[260, 1100, 2300], [0.7, 0.05, 0.02]],
+  };
+  // syllable = onset consonant, vowel, glide-to vowel (diphthong), closing hum
+  const SYL = {
+    yai: { on: 'y', v: 'a', to: 'i' }, dai: { on: 'd', v: 'a', to: 'i' }, ya: { on: 'y', v: 'a' }, da: { on: 'd', v: 'a' },
+    ba: { on: 'b', v: 'a' }, bam: { on: 'b', v: 'a', end: 'm' }, bim: { on: 'b', v: 'i', end: 'm' }, oy: { v: 'o', to: 'i' }, ai: { v: 'a', to: 'i' }, mm: { v: 'm' },
+  };
+  const PATTERNS = { // the classic patterns: "yai dai dai dai", "ya ba ba bam", "bim bam"
+    lively: ['yai', 'da', 'dai', 'da', 'ya', 'ba', 'ba', 'bam'],
+    warm: ['yai', 'dai', 'dai', 'dai', 'oy', 'ya', 'ba', 'bam'],
+    slow: ['oy', 'ai', 'ya', 'bam', 'mm', 'oy', 'yai', 'bam'],
+  };
+  E.syllable = function (L, dur, cad) {
+    const st = L.style;
+    const pat = PATTERNS[st === 'simcha' || st === 'farher' ? 'lively' : st === 'beis' || st === 'genizah' ? 'slow' : 'warm'];
+    L.syl = (L.syl || 0) + 1;
+    if (cad) return dur > 0.5 ? (L.syl % 2 ? 'bam' : 'oy') : 'bam';
+    if (dur > 1.1) return this.r.pick(['oy', 'ai', 'mm']);
+    return pat[L.syl % pat.length];
+  };
+  E.sing = function (L, t, midi, dur, vel, orn, voice, cad) {
+    const c = this.ctx, f = mtof(midi), sy = SYL[this.syllable(L, dur, cad)] || SYL.ya;
+    const choir = voice === 'choir';
+    const src = c.createGain(); src.gain.value = 1;
+    const oscs = [];
+    const mk = (freq, det, lvl) => { const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(freq, t); o.detune.value = det; const g = c.createGain(); g.gain.value = lvl; o.connect(g); g.connect(src); oscs.push(o); return o; };
+    if (choir) { mk(f, -9, 0.45); mk(f, 8, 0.45); mk(f * 0.5, 3, 0.35); mk(f * 1.4983, -4, 0.12); } // unison pair, the octave below, a soft fifth
+    else mk(f, 0, 1);
+    // glottal tilt, then three formant band-passes in parallel
+    const tilt = c.createBiquadFilter(); tilt.type = 'lowpass'; tilt.frequency.value = choir ? 2600 : 3200; tilt.Q.value = 0.3;
+    src.connect(tilt);
+    const sum = c.createGain(), V = VOWEL[sy.v], W = sy.to ? VOWEL[sy.to] : null, Mv = VOWEL.m;
+    const onsetF2 = sy.on === 'b' ? 800 : sy.on === 'd' ? 1700 : sy.on === 'y' ? 2200 : null;
+    const glideAt = t + dur * 0.62, endAt = t + dur * 0.7;
+    [0, 1, 2].forEach(k => {
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = [6, 11, 16][k];
+      const fr = bp.frequency, g = c.createGain();
+      let f0 = V[0][k];
+      if (sy.on === 'y') f0 = VOWEL.i[0][k]; else if (onsetF2 && k === 1) f0 = onsetF2;
+      fr.setValueAtTime(f0, t); fr.linearRampToValueAtTime(V[0][k], t + (sy.on === 'y' ? 0.09 : 0.05));
+      if (W) { fr.setValueAtTime(V[0][k], glideAt); fr.linearRampToValueAtTime(W[0][k], t + dur * 0.95); }
+      if (sy.end === 'm') { fr.setValueAtTime(V[0][k], endAt); fr.linearRampToValueAtTime(Mv[0][k], endAt + 0.06); }
+      const lv = V[1][k] * [2.2, 3.2, 4][k];
+      g.gain.setValueAtTime(lv, t);
+      if (W) { g.gain.setValueAtTime(lv, glideAt); g.gain.linearRampToValueAtTime(W[1][k] * [2.2, 3.2, 4][k], t + dur * 0.95); }
+      if (sy.end === 'm') { g.gain.setValueAtTime(lv, endAt); g.gain.linearRampToValueAtTime(Mv[1][k] * [2.2, 3.2, 4][k], endAt + 0.06); }
+      tilt.connect(bp); bp.connect(g); g.connect(sum);
+    });
+    // a little chest/body below the formants (keeps the hum audible)
+    const body = c.createBiquadFilter(); body.type = 'lowpass'; body.frequency.value = 420; const bg = c.createGain(); bg.gain.value = sy.v === 'm' ? 0.9 : 0.25;
+    tilt.connect(body); body.connect(bg); bg.connect(sum);
+    // consonant: a short dip in loudness at the start (b, d), softer for y
+    const cons = c.createGain();
+    if (sy.on) { cons.gain.setValueAtTime(sy.on === 'y' ? 0.5 : 0.12, t); cons.gain.linearRampToValueAtTime(1, t + (sy.on === 'b' ? 0.035 : 0.025)); }
+    sum.connect(cons);
+    const g = c.createGain(); cons.connect(g); g.connect(L.bus);
+    // vibrato: a singer's, wider and a little slower to start
+    const vg = c.createGain(); vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(0, t + 0.28); vg.gain.linearRampToValueAtTime(choir ? 14 : 24, t + 0.6);
+    this.vib.connect(vg);
+    let dip = 0;
+    oscs.forEach(o => {
+      vg.connect(o.detune);
+      const fr = o.frequency, base = fr.value || f, mult = (o === oscs[2] && choir) ? 0.5 : (o === oscs[3] && choir) ? 1.4983 : 1, ff = f * mult;
+      if (orn === 'scoop') { fr.setValueAtTime(ff * 0.944, t); fr.exponentialRampToValueAtTime(ff, t + 0.1); }
+      else if (orn === 'krechts' && dur > 0.35) { const tk = t + dur * 0.55; dip = tk; fr.setValueAtTime(ff, tk); fr.linearRampToValueAtTime(ff * 1.06, tk + 0.05); fr.linearRampToValueAtTime(ff * 0.985, tk + 0.13); fr.linearRampToValueAtTime(ff, tk + 0.2); }
+      else if ((orn === 'grace' || orn === 'mordent') && dur > 0.2) { fr.setValueAtTime(ff * 1.12, t); fr.setValueAtTime(ff, t + 0.06); }
+      void base;
+    });
+    const end = this.env(g, t, dur, vel * (choir ? 1.7 : 1.55), choir ? 0.09 : 0.06, choir ? 0.2 : 0.14, dip) + 0.05;
+    oscs.forEach(o => { o.start(t); o.stop(end); });
+    oscs[0].onended = () => { try { this.vib.disconnect(vg); } catch (e) {} };
+  };
+
+  E.lead = function (L, t, midi, dur, vel, orn, voice, upperMidi, cad) {
+    if (VOICES.includes(voice)) return this.sing(L, t, midi, dur, vel, orn, voice, cad);
     const c = this.ctx, f = mtof(midi), fu = mtof(upperMidi || midi + 2);
     const g = c.createGain(); const oscs = [];
     let filt = c.createBiquadFilter(); filt.type = 'lowpass';
@@ -10978,7 +11169,8 @@ body.golem-growl::after {
     const send = c.createGain(); send.gain.value = def.verb;
     this.bus.connect(this.gain); this.dry.connect(this.gain); this.bus.connect(send); send.connect(eng.verbIn); this.gain.connect(eng.mix);
     this.sustained = []; this.end = Infinity;
-    this.tune = makeTune(eng.r, def, eng.festive);
+    this.style = def.style || mood;
+    this.tune = def.fixed != null ? makeTune(rng(def.fixed), def, false) : makeTune(eng.r, def, eng.festive);
     this.startDrones(at);
   }
   const LP = Layer.prototype;
@@ -11000,12 +11192,13 @@ body.golem-growl::after {
       if (lfoRate) { const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = lfoRate; lg.gain.value = lfoDepth; l.connect(lg); lg.connect(f.frequency); l.start(at); this.sustained.push(l); }
       return g;
     };
-    if (this.mood === 'beis') {
+    const st = this.style;
+    if (st === 'beis') {
       tone(T - 24, 'sawtooth', 0.028, 380, 0.07, 160); tone(T - 24, 'sine', 0.07, 2000);
       tone(T - 17, 'sawtooth', 0.016, 420, 0.05, 140, 4);
-    } else if (this.mood === 'farher') {
+    } else if (st === 'farher') {
       tone(T - 24, 'sawtooth', 0.03, 300, 0.23, 220); tone(T - 17, 'sawtooth', 0.02, 320, 0.31, 180, -6);
-    } else if (this.mood === 'genizah') {
+    } else if (st === 'genizah') {
       // the held note: a high harmonic that never resolves, slowly breathing
       const held = tone(T + 19, 'sine', 0.05, 6000); tone(T + 19, 'sine', 0.03, 6000, 0, 0, 7);
       const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = 0.13; lg.gain.value = 0.02; l.connect(lg); lg.connect(held.gain); l.start(at); this.sustained.push(l);
@@ -11024,13 +11217,14 @@ body.golem-growl::after {
     const ins = this.eng.instrument;
     if (ins !== 'ensemble') return ins;
     const sec = this.tune.bars[bar].section, second = this.plays % 2 === 1;
-    if (this.mood === 'simcha' || this.mood === 'farher') return (sec === 'A') !== second ? 'clarinet' : 'violin';
-    if (this.mood === 'genizah') return 'violin';
+    if (this.style === 'simcha' || this.style === 'farher') return (sec === 'A') !== second ? 'clarinet' : 'violin';
+    if (this.style === 'genizah') return 'violin';
     return (sec === 'A') !== second ? 'violin' : 'clarinet';
   };
   LP.ornament = function (n, dur, voice) {
     const o = this.def.orn, r = this.eng.r;
     if (voice === 'strings') return r.chance(0.15) ? 'scoop' : null;
+    if (VOICES.includes(voice) && n.cad && dur > 0.4) return r.chance(0.6) ? 'krechts' : 'scoop';
     if (n.cad && dur > 0.4 && r.chance(0.5)) return 'krechts';
     const x = r(); let acc = 0;
     for (const k of ['krechts', 'grace', 'scoop', 'trill', 'mordent']) { acc += o[k] || 0; if (x < acc) return voice === 'clarinet' && k === 'trill' ? 'mordent' : k; }
@@ -11042,24 +11236,24 @@ body.golem-growl::after {
     const n = tune.at[pos];
     if (n) {
       const voice = this.voiceFor(bar), dur = n.len * sd * (d.spb === 16 ? 0.92 : 0.97);
-      const midi = pitch(tune, n.deg) + (voice === 'strings' && this.mood !== 'genizah' ? -12 : 0);
+      const midi = pitch(tune, n.deg) + (voice === 'strings' && this.style !== 'genizah' ? -12 : 0) + (VOICES.includes(voice) ? -12 : 0);
       const vel = d.leadVel * (sb === 0 ? 1 : 0.85) * (0.92 + e.r() * 0.16);
-      e.lead(this, t, midi, dur, vel, this.ornament(n, dur, voice), voice, pitch(tune, n.deg + 1) + (midi - pitch(tune, n.deg)));
-      if (e.instrument === 'ensemble' && b.section === 'B' && this.plays % 2 === 1 && this.mood !== 'genizah' && this.mood !== 'farher')
+      e.lead(this, t, midi, dur, vel, this.ornament(n, dur, voice), voice, pitch(tune, n.deg + 1) + (midi - pitch(tune, n.deg)), !!n.cad);
+      if (e.instrument === 'ensemble' && b.section === 'B' && this.plays % 2 === 1 && this.style !== 'genizah' && this.style !== 'farher')
         e.lead(this, t, midi - 12, dur, vel * 0.45, null, 'strings');
     }
     this.accompany(t, sd, pos, bar, sb, b);
     this.step++;
     if (this.step % tune.len === 0) {
       this.plays++;
-      if (this.plays % 2 === 0) { const tonic = tune.tonic; this.tune = makeTune(e.r, d, e.festive); if (this.sustained.length) this.tune.tonic = tonic; }
+      if (this.plays % 2 === 0 && d.fixed == null) { const tonic = tune.tonic; this.tune = makeTune(e.r, d, e.festive); if (this.sustained.length) this.tune.tonic = tonic; }
     }
     this.next += sd;
   };
   LP.accompany = function (t, sd, pos, bar, sb, b) {
     const e = this.eng, tune = this.tune, c = b.chord, P = deg => pitch(tune, deg), r = e.r;
     const chordMidis = base => [P(c), P(c + 2), P(c + 4)].map(m => m + base);
-    switch (this.mood) {
+    switch (this.style) {
       case 'beis': { // oud arpeggio in quarters + soft string pad on ensemble/strings
         if (sb % 2 === 0) {
           const pat = [c - 7, c + 4 - 7, c + 2, c + 4 - 7][sb / 2];
@@ -11136,6 +11330,8 @@ body.golem-growl::after {
 
   const M = G.SQLGMusic = {
     moods: MOODS,
+    tracks: TRACKS,
+    voices: VOICES.slice(),
     instruments: INSTRUMENTS.slice(),
     tempos: Object.keys(TEMPO),
     enabled: false,
@@ -11327,6 +11523,24 @@ body.golem-growl::after {
   const BROWS = { brows_none: 'None', brows_thin: 'Thin', brows_thick: 'Thick', brows_straight: 'Straight', brows_arched: 'Arched', brows_bushy: 'Bushy' };
   const HAIRS = { hair_none: 'None (tucked)', hair_short: 'Short peyos', hair_medium: 'Medium peyos', hair_long: 'Long peyos', hair_curled: 'Curled peyos' };
   const BEARDS = { beard_none: 'None', beard_fuzz: 'First fuzz', beard_short: 'Short trimmed beard', beard_full: 'Short full beard' };
+  // v3.3 (student feedback): the beard can have its own colour; "Same as hair" keeps old saves unchanged.
+  const BEARDC = {
+    bc_match:   { label: 'Same as hair' },
+    bc_black:   { label: 'Black',      c: '#1a1008' },
+    bc_dkbrown: { label: 'Dark brown', c: '#3a2410' },
+    bc_brown:   { label: 'Brown',      c: '#6b4423' },
+    bc_auburn:  { label: 'Auburn',     c: '#8a3b1c' },
+    bc_ginger:  { label: 'Ginger',     c: '#b5521f' },
+    bc_blond:   { label: 'Blond',      c: '#c9a24a' },
+    bc_salt:    { label: 'Salt-and-pepper', c: '#7d7a76' },
+    bc_silver:  { label: 'Silver (Zeidy)', c: '#c9c6c0' },
+  };
+  // v3.3: haircuts (the "Hair & peyos" slot only ever changed the peyos)
+  const CUTS = { cut_side: 'Short side part', cut_crew: 'Crew cut', cut_full: 'Fuller on top', cut_back: 'Combed back', cut_wavy: 'Wavy', cut_curly: 'Curly' };
+  // v3.3: yarmulke size (students asked for bigger ones)
+  const KIPPAH = { ks_regular: 'Regular', ks_large: 'Large', ks_xl: 'Extra large' };
+  // Canteen items: bought with XP in the game's Canteen (unlock type 'shop'; the UI records them in save.avatar.owned)
+  const SHOP = (price, how) => ({ type: 'shop', value: price, price, riddle: `For sale in the Canteen — ${price} XP.`, how: how || `Buy it in the Canteen for ${price} XP.` });
   const JACKETS = {
     jacket_black:    { label: 'Black',        c: '#1a1008' },
     jacket_charcoal: { label: 'Charcoal',     c: '#3a3a40' },
@@ -11393,6 +11607,12 @@ body.golem-growl::after {
     it('null_halo', 'Empty-set halo', U('ending', 'null', 'In SQL, one special word stands for "nothing here" or "unknown". It is not zero and not an empty string. What is it?', 'null', ['nil', 'none', 'nothing'], 'Reach the secret ending called "NULL".'), { zone: 'float' }),
     it('sparkles', 'Minyan of sparkles', U('egg', 'ten_eggs', 'Ten Jewish men make the quorum needed to say Kaddish and Borchu. What is that group called?', 'minyan', ['minyon', 'minyanim', 'minyan of ten'], 'Discover 10 other hidden secrets (eggs) in the game.'), { zone: 'float' }),
     it('tzvi_zzz', 'Tzvi snooze', U('ending', 'tzvi', 'Z-z-z. Up in the attic Tzvi is fast sleeping and having a dream. What is he doing, in one word?', 'sleeping', ['sleep', 'asleep', 'snoozing', 'napping', 'dreaming', 'snoring'], 'Reach the secret ending called "Tzvi\'s Blatt".'), { zone: 'float' }),
+    // Canteen (bought with XP) — v3.3
+    it('becher', 'Silver kiddush becher', SHOP(300), { zone: 'hand' }),
+    it('esrog_box', 'Silver esrog box', SHOP(350), { zone: 'hand' }),
+    it('seforim_stack', 'Stack of seforim', SHOP(250), { zone: 'under' }),
+    it('pocket_tehillim', 'Pocket Tehillim', SHOP(150), { zone: 'pocket' }),
+    it('shas_pin', 'Shas pin (six sedarim)', SHOP(200), { zone: 'lapel' }),
     it('glowing_shtender', 'Glowing shtender', U('allEggs', null, 'Secrets are hidden all over the game. Find every last one of them and the shtender starts to glow. What do we call these hidden secrets?', 'eggs', ['egg', 'easter egg', 'easter eggs', 'secret', 'secrets'], 'Find every hidden secret (egg) in the game.'), { zone: 'bg' }),
   ];
 
@@ -11453,6 +11673,9 @@ body.golem-growl::after {
     brows: mk(BROWS),
     hair: mk(HAIRS),
     beard: mk(BEARDS),
+    beardColor: mk(BEARDC, { bc_salt: SHOP(250), bc_silver: SHOP(400) }),
+    haircut: mk(CUTS),
+    kippah: mk(KIPPAH),
     hat: mk(HATS, HAT_UNLOCK).filter(i => i.id !== 'hat_knitted' && i.id !== 'hat_cap'), // knitted kippah / cap removed for the yeshiva dress code (old saves fall back to the default hat)
     jacket: mk(JACKETS, JACKET_UNLOCK),
     shirt: mk(SHIRTS, SHIRT_UNLOCK),
@@ -11461,9 +11684,9 @@ body.golem-growl::after {
     glasses: Object.keys(GLASSES).map(k => GLASSES[k]),
     accessories: ACC,
   };
-  const SLOTS_ORDER = ['skin', 'face', 'hairColor', 'hair', 'beard', 'eyes', 'brows', 'hat', 'glasses', 'jacket', 'shirt', 'tie', 'tzitzis', 'accessories'];
+  const SLOTS_ORDER = ['skin', 'face', 'hairColor', 'haircut', 'hair', 'beard', 'beardColor', 'eyes', 'brows', 'hat', 'kippah', 'glasses', 'jacket', 'shirt', 'tie', 'tzitzis', 'accessories'];
   const SLOT_DEFAULT = {
-    face: 'face_oval', skin: 'skin_light', hairColor: 'hc_black', hair: 'hair_short', beard: 'beard_none', eyes: 'eyes_round', brows: 'brows_straight',
+    face: 'face_oval', skin: 'skin_light', hairColor: 'hc_black', hair: 'hair_short', haircut: 'cut_side', beard: 'beard_none', beardColor: 'bc_match', kippah: 'ks_regular', eyes: 'eyes_round', brows: 'brows_straight',
     hat: 'hat_yarmulke_black', jacket: 'jacket_black', shirt: 'shirt_white', tie: 'tie_none', tzitzis: 'tz_tucked', glasses: 'glasses_none',
   };
   const ITEM = {}; // id -> { slot, item }
@@ -11772,12 +11995,25 @@ body.golem-growl::after {
     return o;
   }
 
-  /* hair: a short, neat yeshiva haircut that hugs the skull, sideburns down to the ear */
+  /* hair: a short, neat yeshiva haircut that hugs the skull, sideburns down to the ear.
+     v3.3: six haircuts (cfg.haircut). top = extra volume on the crown, wave/curl = texture of the outline. */
+  const CUT = {
+    // top: crown volume · side: fullness over the temples · fr: fringe (hairline) moved down (+) or up (−)
+    cut_side:  { top: 2,   side: 1,   fr: 0,    wave: 0,   curl: 0, strands: 'side' },
+    cut_crew:  { top: .9,  side: .45, fr: -1.3, wave: 0,   curl: 0, strands: 'crew' },
+    cut_full:  { top: 3.6, side: 1.5, fr: 1.7,  wave: 0,   curl: 0, strands: 'side' },
+    cut_back:  { top: 2.6, side: 1.1, fr: -1.7, wave: 0,   curl: 0, strands: 'back' },
+    cut_wavy:  { top: 2.8, side: 1.3, fr: .9,   wave: 1.1, curl: 0, strands: 'wavy' },
+    cut_curly: { top: 3.1, side: 1.5, fr: 1,    wave: 0,   curl: 1.5, strands: 'curly' },
+  };
+  function hairTop(cfg, g) { const k = CUT[cfg.haircut] || CUT.cut_side; return .5 + .9 + k.top + (k.curl ? .8 : 0) + (k.wave ? .5 : 0); }
   function hairSvg(X) {
-    const { g, u, cfg, hc } = X, H = g.H, t = g.t, hl = g.hl;
-    const vol = y => .5 + .9 * clamp((49 - y) / 7, 0, 1) + 2 * clamp((38 - y) / (38 - t), 0, 1);
+    const { g, u, cfg, hc } = X, H = g.H, t = g.t;
+    const K = CUT[cfg.haircut] || CUT.cut_side, hl = g.hl + K.fr;
+    const bump = y => K.wave ? K.wave * (.5 + .5 * Math.sin(y * 1.1)) : K.curl ? K.curl * Math.abs(Math.sin(y * 1.45)) : 0;
+    const vol = y => .5 + .9 * K.side * clamp((49 - y) / 7, 0, 1) + K.top * clamp((38 - y) / (38 - t), 0, 1) + bump(y) * clamp((49 - y) / 4, 0, 1);
     const yS = cfg.hair === 'hair_none' ? 47 : 49, sb = 2.5;
-    const outR = g.side(t, yS, vol, 2);
+    const outR = g.side(t, yS, vol, K.curl ? 1 : 2);
     const inR = [[50 + H(yS) - sb, yS], [50 + H(42) - sb - .2, 42], [50 + H(36.5) - 3.4, 36.4], [50 + g.wt - 5.6, hl + .9], [50 + g.wt * .38, hl - .2], [50, hl + .3]];
     const inner = inR.concat(inR.slice(0, -1).reverse().map(p => [100 - p[0], p[1]]));
     const hairline = segD(crSegs(inner, false), true);
@@ -11785,18 +12021,43 @@ body.golem-growl::after {
     let o = `<defs><path id="${u}H" d="${hairline}"/></defs><g clip-path="url(#${u}c)"><use href="#${u}H" stroke="${darken(X.sk.b, .45)}" stroke-width="2.4" opacity=".35" filter="url(#${u}b)"/></g>`;
     o += `<path d="${d}" fill="url(#${u}h)"/>`;
     o += `<use href="#${u}H" stroke="${hc}" stroke-width="1.2" opacity=".5" filter="url(#${u}s)"/>`;
-    // combed strands from a side part
     const part = 50 - g.wt * .42;
     let a = '', b = '';
-    for (let i = 0; i < 6; i++) {
-      const y0 = hl - .6 - i * 1.5, x1 = 50 + g.wt * (.78 - i * .09), y1 = hl + .2 - i * 1.7 + i * i * .03;
-      const seg = `M${P(part + .4, y0)}Q${P(part + 7 + i, y0 - 2.6)} ${P(x1, y1)}`;
-      if (i % 2) a += seg; else b += seg;
+    if (K.strands === 'side') { // combed strands from a side part
+      for (let i = 0; i < 6; i++) {
+        const y0 = hl - .6 - i * 1.5, x1 = 50 + g.wt * (.78 - i * .09), y1 = hl + .2 - i * 1.7 + i * i * .03;
+        const seg = `M${P(part + .4, y0)}Q${P(part + 7 + i, y0 - 2.6)} ${P(x1, y1)}`;
+        if (i % 2) a += seg; else b += seg;
+      }
+      for (let i = 0; i < 2; i++) { const y0 = hl - 1.4 - i * 2.4; b += `M${P(part - .3, y0)}Q${P(part - 4, y0 - .6)} ${P(50 - g.wt * (.86 - i * .05), hl + 2.2 - i * .9)}`; }
+    } else if (K.strands === 'crew') { // short, even stubble-like texture
+      for (let r = 0; r < 4; r++) for (let i = -6; i <= 6; i++) {
+        const x = 50 + i * g.wt * .13 + (r % 2) * .9, y = hl - 1 - r * 2.2 - (1 - Math.abs(i) / 7) * .6;
+        if (y < t - .4) continue;
+        const seg = `M${P(x, y)}l.3,-.9`; if ((i + r) % 2) a += seg; else b += seg;
+      }
+    } else if (K.strands === 'back') { // combed straight back from the forehead
+      for (let i = -5; i <= 5; i++) {
+        const x0 = 50 + i * g.wt * .15, y0 = hl - .4 + Math.abs(i) * .25;
+        const seg = `M${P(x0, y0)}Q${P(x0 + i * .25, (y0 + t) / 2)} ${P(x0 * .96 + 2, t - K.top * .6)}`;
+        if (i % 2) a += seg; else b += seg;
+      }
+    } else if (K.strands === 'wavy') { // soft S-waves from a side part
+      for (let i = 0; i < 6; i++) {
+        const y0 = hl - .8 - i * 1.6, x1 = 50 + g.wt * (.8 - i * .09), mx = (part + x1) / 2;
+        const seg = `M${P(part + .4, y0)}Q${P((part + mx) / 2, y0 - 2.4)} ${P(mx, y0 - .6)}T${P(x1, y0 - .4 + i * .2)}`;
+        if (i % 2) a += seg; else b += seg;
+      }
+    } else if (K.strands === 'curly') { // small curls all over the crown
+      for (let r = 0; r < 4; r++) for (let i = -4; i <= 4; i++) {
+        const x = 50 + i * g.wt * .2 + (r % 2) * 1.6, y = hl - .6 - r * 2.5;
+        if (y < t - 1 || Math.abs(x - 50) > H(y) + .5) continue;
+        const seg = `M${P(x - 1, y)}a1,.9 0 1 1 1.6,.6`; if ((i + r) % 2) a += seg; else b += seg;
+      }
     }
-    for (let i = 0; i < 2; i++) { const y0 = hl - 1.4 - i * 2.4; b += `M${P(part - .3, y0)}Q${P(part - 4, y0 - .6)} ${P(50 - g.wt * (.86 - i * .05), hl + 2.2 - i * .9)}`; }
     const sid = [-1, 1].map(s => `M${P(50 + s * (H(38) - 1.2), 37.4)}L${P(50 + s * (H(yS - 1) - 1), yS - 1)}`).join('');
-    o += ln(a, lighten(hc, .32), .5, .45) + ln(sid, darken(hc, .4), .5, .5) + ln(b, darken(hc, .45), .55, .55);
-    o += ln(`M${P(part, hl + .1)}Q${P(part - .6, (hl + t) / 2)} ${P(part + .6, t - 1.4)}`, darken(hc, .5), .5, .7);
+    o += `<clipPath id="${u}hk"><path d="${d}"/></clipPath><g clip-path="url(#${u}hk)">` + ln(a, lighten(hc, .32), .5, .45) + ln(b, darken(hc, .45), .55, .55) + '</g>' + ln(sid, darken(hc, .4), .5, .5);
+    if (K.strands === 'side' || K.strands === 'wavy') o += ln(`M${P(part, hl + .1)}Q${P(part - .6, (hl + t) / 2)} ${P(part + .6, t - 1.4)}`, darken(hc, .5), .5, .7);
     o += `<path d="M${PL(g.side(t, t + 8, () => vol(t) - 1.4, 2).reverse().map(mirP))}" stroke="${lighten(hc, .35)}" stroke-width="1.4" opacity=".35" filter="url(#${u}s)"/>`;
     return o;
   }
@@ -11840,8 +12101,9 @@ body.golem-growl::after {
 
   /* beards follow the jaw of the chosen face */
   function beardSvg(X) {
-    const { g, cfg, hc, u } = X, st = cfg.beard, H = g.H;
+    const { g, cfg, u } = X, st = cfg.beard, H = g.H;
     if (st === 'beard_none' || !BEARDS[st]) return '';
+    const bc = BEARDC[cfg.beardColor] && BEARDC[cfg.beardColor].c, hc = bc || X.hc, fillB = bc ? `url(#${u}d)` : `url(#${u}h)`;
     const mous = (th, ex) => `M${P(43.4 - ex, 66.1)}C${P(44.4, 63.4 - th * .4)} ${P(47, 61.7 - th * .3)} ${P(49.4, 62.1)}L50,62.5L50.6,62.1C${P(53, 61.7 - th * .3)} ${P(55.6, 63.4 - th * .4)} ${P(56.6 + ex, 66.1)}C${P(54.8, 64.9)} ${P(52.6, 64.6 + th * .2)} 50,${f1(64.8 + th * .2)}C${P(47.4, 64.6 + th * .2)} ${P(45.2, 64.9)} ${P(43.4 - ex, 66.1)}Z`;
     if (st === 'beard_fuzz') {
       const band = g.side(50, g.b, () => -1.5, 3), pts = band.concat(band.slice(0, -1).reverse().map(mirP));
@@ -11861,7 +12123,7 @@ body.golem-growl::after {
       const seg = `M${P(bx, by)}l${f1(p.nx * .6 - s * .2)},${f1(full ? 1.8 : 1.1)}`;
       if (i % 4) a += seg; else b += seg;
     });
-    return `<g filter="url(#${u}s)"><path d="${d}" fill="url(#${u}h)" opacity="${full ? .95 : .85}"/><path d="${mous(full ? .5 : 0, 0)}" fill="${hc}" opacity="${full ? .9 : .7}"/></g>`
+    return `<g filter="url(#${u}s)"><path d="${d}" fill="${fillB}" opacity="${full ? .95 : .85}"/><path d="${mous(full ? .5 : 0, 0)}" fill="${hc}" opacity="${full ? .9 : .7}"/></g>`
       + ln(a, lighten(hc, .3), .4, .55) + ln(b, darken(hc, .45), .45, .6)
       + ln('M45,63.6Q47.6,62.6 49.4,63.4M50.6,63.4Q52.4,62.6 55,63.6', lighten(hc, .28), .35, .45);
   }
@@ -11956,7 +12218,10 @@ body.golem-growl::after {
       return s;
     }
     // velvet yarmulke (the default; "No hat" keeps the yarmulke on, retired/unknown ids fall back to it)
-    const col = id === 'hat_velvet' ? '#1b2a55' : '#0c0908', t = g.t, yb = t + 3.6, w = g.H(t + 3.6) * .82, ap = t - 3.9;
+    // v3.3: bigger yarmulkes (student feedback) — the old one sat like a small cap on the crown (yb t+3.6, 82 % wide).
+    const KS = { ks_regular: [5.4, .93], ks_large: [7.2, .99], ks_xl: [9.2, 1.03] }[X.cfg.kippah] || [5.4, .93];
+    const lift = Math.max(0, hairTop(X.cfg, g) - 3.4);
+    const col = id === 'hat_velvet' ? '#1b2a55' : '#0c0908', t = g.t, yb = t + KS[0] - lift * .4, w = (g.H(yb) + lift * .5) * KS[1], ap = t - 3.9 - lift * .8;
     const cy = (8 * ap - 2 * yb) / 6;
     let s = `<path d="M${P(50 - w, yb)}C${P(50 - w + .3, cy)} ${P(50 + w - .3, cy)} ${P(50 + w, yb)}C${P(50 + w * .5, yb + 1.9)} ${P(50 - w * .5, yb + 1.9)} ${P(50 - w, yb)}Z" fill="url(#${u}v)"/>`;
     s += ln(`M${P(50, ap + .2)}Q${P(45.6, t)} ${P(50 - w * .45, yb + 1.3)}M${P(50, ap + .2)}Q${P(54.4, t)} ${P(50 + w * .45, yb + 1.3)}`, '#000', .4, .55);
@@ -12020,6 +12285,16 @@ body.golem-growl::after {
       o += ln(r, darken(v, .3), .35, .55) + ln('M42.4,87.2L50,101.8L57.6,87.2', darken(v, .3), 1.8) + ln('M42.9,87.6L50,101.2L57.1,87.6', lighten(v, .2), .45, .6);
     }
     if (tie.c) o += `<path d="M47.3,89.2L52.7,89.2L51.6,94.3L48.4,94.3Z" fill="${lighten(tie.c, .1)}"/>` + ln('M48.6,93.9L51.4,93.9', darken(tie.c, .5), .5, .6) + ln('M48.6,90L49.6,93.4', lighten(tie.c, .35), .5, .4);
+    // v3.3 (student feedback): the strings used to start high on the chest, as if out of a breast pocket.
+    // Tzitzis hang from the corners of the beged at the waist: they now come out from under the open jacket's
+    // front edge at belt level (the bottom of this portrait is the belt — where the tie ends) and hang down.
+    // Drawn before the jacket, so the jacket's front edge covers where they start.
+    if (cfg.tzitzis === 'tz_showing') {
+      let d = '';
+      for (let i = 0; i < 4; i++) { const x = 43.2 + i * .9; d += `M${P(x, 102.4)}C${P(x + .9, 105.4)} ${P(x + 1.3 + i * .1, 109)} ${P(x + 1.1 + i * .35, 113.6)}`; }
+      const one = ln(d, '#000', 1.25, .4) + ln(d, '#f6f2e8', .66) + ln('M44.6,105.6L48.2,105.8M45,108.4L48.8,108.6', '#e4dccb', 1.45);
+      o += `<g id="${u}Z">${one}</g><use href="#${u}Z" transform="${MIR}"/>`; // both sides, like real tzitzis
+    }
     const A = [50 - nw - 1.8, 79.4];
     o += `<g id="${u}C"><path d="M${PA(A)}C${P(A[0] - .2, 84)} 45.4,88.2 49.4,89.6L43.4,97.2Q39.6,92.4 38,86.8Q37.6,82.2 ${PA(A)}Z" fill="${lighten(sh.c, .2)}" stroke="${shD}" stroke-width=".4"/>`
       + `</g><use href="#${u}C" transform="${MIR}"/>`;
@@ -12033,11 +12308,6 @@ body.golem-growl::after {
       + ln('M35,80.8C26,82.6 17,85.8 11.8,89.6', edge, 1, .45) + ln('M12.4,90.8C10.6,96 10,103 10.4,113', dk, .6, .6) 
       + `</g><use href="#${u}L" transform="${MIR}"/>`;
     o += ln('M68,104.6L78,103.4', dk, .8, .8) + ln('M68,104L78,102.8', edge, .4, .5) + ln('M63.4,93.8L65.6,93', dk, .6, .8);
-    if (cfg.tzitzis === 'tz_showing') {
-      let d = '';
-      for (let i = 0; i < 4; i++) { const x = 41 + i * .95; d += `M${P(x + .9, 97.4)}C${P(x + .4, 101.6)} ${P(x - .2 + i * .1, 106)} ${P(x - .7 + i * .35, 113)}`; }
-      o += ln(d, '#000', 1.2, .35) + ln(d, '#f2ede2', .62) + ln('M41.2,100.4L45.4,100.2M40.9,103.4L44.9,103.2', '#e4dccb', 1.5);
-    }
     return o;
   }
 
@@ -12126,6 +12396,16 @@ body.golem-growl::after {
       }
       case 'tzvi_zzz':
         return `<path d="M76,26 h8 l-8,8 h8" stroke="#9ec3ff" stroke-width="1.8" fill="none" stroke-linejoin="round" stroke-linecap="round"/><path d="M84,14 h6 l-6,6 h6" stroke="#9ec3ff" stroke-width="1.5" fill="none" stroke-linejoin="round" stroke-linecap="round" opacity=".85"/><path d="M91,5 h4 l-4,4 h4" stroke="#9ec3ff" stroke-width="1.2" fill="none" stroke-linejoin="round" stroke-linecap="round" opacity=".65"/>`;
+      case 'becher':
+        return `<path d="M73,86 L87,86 L85.4,96 Q80,100 74.6,96Z" fill="#d8dce4" stroke="#8a8f9a" stroke-width=".8"/><path d="M74,88 L86,88" stroke="#fff" stroke-width=".8" opacity=".7"/><path d="M74.4,90 L85.6,90 L85.2,93 Q80,96 74.8,93Z" fill="#7a1c2c" opacity=".85"/><path d="M80,98 L80,104" stroke="#b8bcc6" stroke-width="2"/><ellipse cx="80" cy="105" rx="5" ry="1.6" fill="#c8ccd6" stroke="#8a8f9a" stroke-width=".6"/><path d="M76,92 q4,2 8,0" stroke="#8a8f9a" stroke-width=".5" fill="none"/>${hand(86, 104, c, 3.4)}`;
+      case 'esrog_box':
+        return `<path d="M71,95 Q71,88 80,87 Q89,88 89,95 L89,103 Q80,107 71,103Z" fill="#d8dce4" stroke="#8a8f9a" stroke-width=".8"/><path d="M71,95 Q80,99 89,95" stroke="#8a8f9a" stroke-width=".7" fill="none"/><ellipse cx="80" cy="86.6" rx="2.4" ry="1.3" fill="#c8ccd6" stroke="#8a8f9a" stroke-width=".5"/><path d="M74,100 q2,-2 4,0 q2,2 4,0 q2,-2 4,0" stroke="#9aa0ac" stroke-width=".7" fill="none"/><path d="M76,91 Q80,89 84,91" stroke="#fff" stroke-width=".8" opacity=".6" fill="none"/>${hand(87, 106, c, 3.4)}`;
+      case 'seforim_stack':
+        return `<g transform="rotate(-6 20 98)"><rect x="7" y="99" width="25" height="7" rx="1" fill="#1f3d6b"/><rect x="9" y="92" width="22" height="7" rx="1" fill="#5a1f1f"/><rect x="8" y="85.4" width="23" height="6.6" rx="1" fill="#2a2a2a"/><path d="M12,102 h14 M13,95 h11 M12,88.4 h12" stroke="#cca300" stroke-width="1"/><path d="M31,100 v5 M30,93 v5 M30,86.4 v4.6" stroke="#f0e6d0" stroke-width="1.4"/></g>${hand(20, 108, c)}`;
+      case 'pocket_tehillim':
+        return `<rect x="59" y="92" width="9" height="11.4" rx="1" fill="#2a4a2a" stroke="#14280f" stroke-width=".5"/><rect x="60.2" y="93.4" width="6.6" height="1" fill="#cca300"/><path d="M61.6,97 h4 M62,99 h3.2" stroke="#cca300" stroke-width=".7"/>`;
+      case 'shas_pin':
+        return `<circle cx="32" cy="95" r="4.4" fill="#f0e6d0" stroke="#8a6e00" stroke-width=".9"/>` + [0, 1, 2, 3, 4, 5].map(i => { const a = i * Math.PI / 3 - Math.PI / 2; return `<circle cx="${f(32 + 2.6 * Math.cos(a))}" cy="${f(95 + 2.6 * Math.sin(a))}" r=".85" fill="#5a1f1f"/>`; }).join('') + `<circle cx="32" cy="95" r=".9" fill="#cca300"/>`;
       case 'glowing_shtender':
         return `<circle cx="50" cy="56" r="52" fill="#f0c842" opacity=".07"/><circle cx="50" cy="56" r="42" fill="#f0c842" opacity=".08"/><circle cx="50" cy="56" r="32" fill="#f0c842" opacity=".1"/><path d="M80,100 L96,92 L96,98 L82,106Z" fill="#f0c842" opacity=".55"/><rect x="82" y="104" width="13" height="8" fill="#f0c842" opacity=".4"/>`;
     }
@@ -12160,6 +12440,7 @@ body.golem-growl::after {
       + rg(u + 'k', [[0, sk.hi], [.5, B], [1, sk.sh]], 'cx=".42" cy=".4" r=".68"')
       + lg(u + 'm', [[0, sk.dk], [.5, sk.sh], [1, mix(B, sk.sh, .3)]], `x2="0" y1="${f1((g.b - 63) / 26)}" y2="${f1((g.b - 51) / 26)}"`)
       + lg(u + 'h', [[0, lighten(hc, .2)], [.4, hc], [1, darken(hc, .2)]])
+      + (BEARDC[cfg.beardColor] && BEARDC[cfg.beardColor].c ? lg(u + 'd', [[0, lighten(BEARDC[cfg.beardColor].c, .2)], [.4, BEARDC[cfg.beardColor].c], [1, darken(BEARDC[cfg.beardColor].c, .2)]]) : '')
       + lg(u + 'j', [[0, lighten(j, .2)], [.3, lighten(j, .05)], [1, darken(j, .3)]])
       + hatDefs(X, cfg.hat);
     if (!shades) d += lg(u + 'w', [[0, mix('#efe8dc', sk.sh, .45)], [.5, mix('#f3eee6', B, .08)], [1, mix('#e6ded2', B, .15)]])
@@ -12194,13 +12475,16 @@ body.golem-growl::after {
   /* thumbnails for a wardrobe grid: the avatar wearing (only) that item */
   const THUMB_VB = {
     skin: '12 14 76 76', face: '12 14 76 76', hairColor: '12 10 76 76', hair: '12 14 76 76', eyes: '26 33 48 48', brows: '26 31 48 48',
-    beard: '14 40 72 54', hat: '4 0 92 62', glasses: '22 31 56 46', jacket: '0 56 100 56', shirt: '22 66 56 46', tie: '22 66 56 46', tzitzis: '22 76 46 36',
+    beard: '14 40 72 54', hat: '4 0 92 62', glasses: '22 31 56 46', jacket: '0 56 100 56', shirt: '22 66 56 46', tie: '22 66 56 46', tzitzis: '30 88 40 26', haircut: '20 6 60 50', beardColor: '14 40 72 54', kippah: '18 2 64 44',
     accessories: '0 0 100 112',
   };
   function thumb(slot, itemId, config, opts) {
     const cfg = sanitize(config);
     if (slot === 'accessories') cfg.accessories = [itemId];
     else if (ITEM[itemId] && ITEM[itemId].slot === slot) cfg[slot] = itemId;
+    // show a yarmulke (not a hat that hides it) when choosing a yarmulke size or a haircut
+    if ((slot === 'kippah' || slot === 'haircut') && !/^hat_(yarmulke_black|velvet|none)$/.test(cfg.hat)) cfg.hat = 'hat_yarmulke_black';
+    if (slot === 'beardColor' && cfg.beard === 'beard_none') cfg.beard = 'beard_full';
     const o = Object.assign({ size: 56, viewBox: THUMB_VB[slot] || '0 0 100 112', label: (ITEM[itemId] ? ITEM[itemId].item.label : 'Item') }, opts || {});
     return render(cfg, o);
   }
@@ -12408,7 +12692,7 @@ body.golem-growl::after {
   };
   // The Maggid Shiur's own file (src/story/maggid.js) may refine his name, role and portrait.
   if (window.SQLG && window.SQLG.MAGGID) { const MG = window.SQLG.MAGGID; WHO.maggid = Object.assign({}, WHO.maggid, { name: MG.name || WHO.maggid.name, role: MG.role || MG.title || WHO.maggid.role, face: MG.face || MG.emoji || WHO.maggid.face, short: MG.short || WHO.maggid.short }); }
-  const GAME_VERSION = 'v3.2';
+  const GAME_VERSION = 'v3.3';
   const who = id => WHO[id] || WHO.narrator;
 
   const MADREIGOS = [
@@ -12510,8 +12794,8 @@ body.golem-growl::after {
   ];
   const DORM_ROOMS = { Aleph: [204, 206, 210, 212], Beis: [110, 112, 115, 118], Gimmel: [301, 303, 305, 307] };
   const SLOT_LABELS = {
-    beard: 'Beard',
-    skin: 'Skin', face: 'Face', hairColor: 'Hair colour', hair: 'Hair & peyos', eyes: 'Eyes', brows: 'Eyebrows',
+    beard: 'Beard', beardColor: 'Beard colour', haircut: 'Haircut', kippah: 'Yarmulke size',
+    skin: 'Skin', face: 'Face', hairColor: 'Hair colour', hair: 'Peyos', eyes: 'Eyes', brows: 'Eyebrows',
     hat: 'Hat', glasses: 'Glasses', jacket: 'Jacket', shirt: 'Shirt', tie: 'Tie', tzitzis: 'Tzitzis', accessories: 'Accessories',
   };
 
@@ -12527,13 +12811,13 @@ body.golem-growl::after {
 
   function defaultState() {
     return {
-      v: 3, name: '', player: null, avatar: null, xp: 0, solved: {}, attempts: {}, log: {}, xpGot: {}, eggs: [], path: {}, farhers: {},
+      v: 3, name: '', player: null, avatar: null, xp: 0, spent: 0, shop: { owned: [], log: [] }, solved: {}, attempts: {}, log: {}, xpGot: {}, eggs: [], path: {}, farhers: {},
       seenLessons: {}, actShown: {}, unlockedAct: 0, tokens: 0, tokenLevels: {}, finale: false,
       lastLevel: null, started: false, run: 1,
       riddles: {}, another: {}, ways: {}, chazaraLog: [], chazaraRounds: [], chazaraDone: {}, achievements: [], achXp: {}, daily: {},
       story: undefined, scenesShown: {}, greeted: {}, history: [],
       tutor: { taught: {}, kasha: {}, skipActs: {}, offeredSkip: {}, streak: 0, skillFails: {}, forceTeach: {} },
-      settings: { sound: false, music: false, musicPin: null, bigText: false, timers: true, teacher: false, reduceMotion: false, voice: true, voiceAuto: false, voiceName: '', voiceRate: 0.9 },
+      settings: { sound: false, music: false, musicPin: null, bigText: false, timers: true, teacher: false, reduceMotion: false, voice: true, voiceAuto: false, voiceName: '', voiceRate: 0.9, soundPack: 'classic' },
     };
   }
   let state = defaultState();
@@ -12546,6 +12830,9 @@ body.golem-growl::after {
     ['riddles', 'another', 'ways', 'chazaraDone', 'achXp', 'daily', 'scenesShown', 'greeted', 'log', 'xpGot', 'path', 'farhers', 'solved', 'attempts', 'seenLessons', 'actShown', 'tokenLevels']
       .forEach(k => { if (!out[k] || typeof out[k] !== 'object') out[k] = {}; });
     ['eggs', 'achievements', 'chazaraLog', 'chazaraRounds', 'history'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
+    if (!out.shop || typeof out.shop !== 'object') out.shop = { owned: [], log: [] };
+    if (!Array.isArray(out.shop.owned)) out.shop.owned = [];
+    out.spent = Math.max(0, +out.spent || 0);
     out.v = 3;
     return out;
   }
@@ -12562,7 +12849,7 @@ body.golem-growl::after {
   function load() {
     try {
       const raw = Store.get(SAVE_KEY);
-      if (raw) { state = normalize(JSON.parse(raw)); return; }
+      if (raw) { state = normalize(JSON.parse(raw)); if (state.player && !state.player.teacherDemo && !state.profileKey) save(); return; }
       const old = Store.get(OLD_SAVE_KEY);
       if (old && T && T.migrateSave) {
         state = fixMigratedName(normalize(T.migrateSave(JSON.parse(old))));
@@ -12573,13 +12860,58 @@ body.golem-growl::after {
     } catch (e) { console.warn('load failed', e); }
     state = defaultState();
   }
-  function save() { try { Store.set(SAVE_KEY, JSON.stringify(state)); } catch (e) {} }
+  function save() {
+    try {
+      const json = JSON.stringify(state);
+      Store.set(SAVE_KEY, json);
+      // v3.3: every bochur who signs in on this computer keeps his own save (student feedback:
+      // "same name → continue where I was"). The active save above stays the source of truth.
+      if (state.player && state.player.first && !state.player.teacherDemo) {
+        if (!state.profileKey) state.profileKey = profileKeyOf(state.player);
+        Store.set(PROFILE_PREFIX + state.profileKey, JSON.stringify(state));
+        const dir = profileDir();
+        dir.list[state.profileKey] = { name: displayNameOfPlayer(state.player) + (state.player.twin ? ' (' + state.player.twin + ')' : ''), solved: Object.keys(state.solved || {}).length, stars: Object.values(state.solved || {}).reduce((a, b) => a + b, 0), last: state.lastLevel || null, at: Date.now() };
+        dir.active = state.profileKey;
+        Store.set(PROFILES_KEY, JSON.stringify(dir));
+      }
+    } catch (e) {}
+  }
+
+  /* ---------- saves per bochur (v3.3) ---------- */
+  const PROFILES_KEY = 'sqlseder.profiles';
+  const PROFILE_PREFIX = 'sqlseder.p.';
+  function displayNameOfPlayer(p) { return p ? (p.family ? `${p.first} ${p.family}` : p.first) : ''; }
+  // "Dovid Katz", "dovid  katz" and "DOVID-KATZ" are the same bochur.
+  function nameKey(first, family) { return (String(first || '') + '|' + String(family || '')).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-zא-ת|]/g, ''); }
+  function profileKeyOf(p) { return nameKey(p.first, p.family) + (p.twin ? '#' + p.twin : ''); }
+  function profileDir() {
+    try { const d = JSON.parse(Store.get(PROFILES_KEY) || 'null'); if (d && d.list && typeof d.list === 'object') return d; } catch (e) {}
+    return { active: null, list: {} };
+  }
+  function profilesFor(first, family) { // every save on this computer with this name (incl. "a different Dovid Katz")
+    const k = nameKey(first, family), dir = profileDir();
+    return Object.keys(dir.list).filter(id => id === k || id.indexOf(k + '#') === 0).map(id => Object.assign({ id }, dir.list[id]));
+  }
+  function loadProfile(id) {
+    const raw = Store.get(PROFILE_PREFIX + id); if (!raw) return false;
+    try {
+      const st = normalize(JSON.parse(raw)); st.settings = state.settings; st.settings.teacher = false; st.profileKey = id;
+      state = st; applyPlayer(); loadStory(); save(); return true;
+    } catch (e) { return false; }
+  }
+  function deleteProfile(id) {
+    const dir = profileDir(); delete dir.list[id]; if (dir.active === id) dir.active = null;
+    Store.del(PROFILE_PREFIX + id); Store.set(PROFILES_KEY, JSON.stringify(dir));
+  }
+  // Can this browser keep anything at all? (A private window or a locked-down iframe can't.)
+  const storageWorks = (() => { try { const k = 'sqlseder.probe'; window.localStorage.setItem(k, '1'); const ok = window.localStorage.getItem(k) === '1'; window.localStorage.removeItem(k); return ok; } catch (e) { return false; } })();
 
   function exportCode() {
     const keep = {
       v: 3, n: state.name, pl: state.player, av: state.avatar, x: state.xp, s: state.solved, g: state.xpGot, e: state.eggs, p: state.path, f: state.farhers,
       u: state.unlockedAct, a: state.actShown, z: state.finale ? 1 : 0, l: state.lastLevel, lg: state.log, an: state.another, ach: state.achievements,
       ax: state.achXp, d: state.daily, cr: state.chazaraRounds, cd: state.chazaraDone, st: state.story, r: state.run, tu: state.tutor, sc: state.scenesShown,
+      sp: state.spent, sh: state.shop.owned,
     };
     return 'SQLS3-' + btoa(unescape(encodeURIComponent(JSON.stringify(keep))));
   }
@@ -12592,6 +12924,7 @@ body.golem-growl::after {
         name: raw.n || '', player: raw.pl || null, avatar: raw.av || null, xp: raw.x || 0, solved: raw.s, xpGot: raw.g, eggs: raw.e, path: raw.p, farhers: raw.f,
         unlockedAct: raw.u || 0, actShown: raw.a, finale: !!raw.z, lastLevel: raw.l || null, log: raw.lg, another: raw.an, achievements: raw.ach, achXp: raw.ax,
         daily: raw.d, chazaraRounds: raw.cr, chazaraDone: raw.cd, story: raw.st, run: raw.r || 1, tutor: raw.tu, scenesShown: raw.sc, started: true,
+        spent: raw.sp || 0, shop: { owned: Array.isArray(raw.sh) ? raw.sh : [], log: [] },
       });
     } else {
       // a v2 progress code
@@ -12716,8 +13049,9 @@ body.golem-growl::after {
       <div id="top-status" aria-live="polite"></div>
       <div class="top-actions">
         <button class="icon-btn" id="btn-ask" title="Ask Reb Tuvia" aria-label="Ask Reb Tuvia a question">🙋</button>
-        <button class="icon-btn" id="btn-map" title="Level map" aria-label="Level map">🗺️</button>
+        <button class="icon-btn" id="btn-map" title="Level map — the Zman" aria-label="Level map">🗺️</button>
         <button class="icon-btn" id="btn-otzar" title="Otzar" aria-label="Otzar: seforim, skills and secrets">📚</button>
+        <button class="icon-btn" id="btn-canteen" title="The Canteen — spend your XP" aria-label="The Canteen: spend your XP">🛒</button>
         <button class="icon-btn" id="btn-music" title="Music" aria-label="Turn music on">🎵</button>
         <button class="icon-btn" id="btn-sound" title="Sound effects" aria-label="Turn sound effects on">🔇</button>
         <button class="icon-btn" id="btn-settings" title="Settings" aria-label="Settings">⚙️</button>
@@ -12735,6 +13069,7 @@ body.golem-growl::after {
         <div class="xp-row"><span>Shteig points</span><strong id="xp-val">0 XP</strong></div>
         <div class="xp-track" data-egg="xp-bar"><div id="xp-fill"></div></div>
         <div class="xp-row small"><span id="stars-val">★ 0</span><span id="bonus-val" title="Bonus stars from solving it another way">✦ 0</span><span id="tokens-val" title="Free hint tokens from Echad Mi Yodea">🎟️ 0</span></div>
+        <button class="xp-row small spend-row" id="spend-btn" type="button" title="Open the Canteen"><span>🛒 Canteen</span><strong id="spend-val">🪙 0 to spend</strong></button>
       </div>
       <div class="panel">
         <div class="panel-title">Zman progress</div>
@@ -12893,7 +13228,7 @@ body.golem-growl::after {
 
   /* ---------- avatar & beis medrash windows ---------- */
   let moodTimer = null, avMood = 'neutral';
-  const MOODS = { neutral: 'Ready to pasken…', happy: 'Yashar koach!', sad: 'Oy. Try again.', thinking: 'Hmm, a kasha…', sunglasses: 'Bein Hazmanim mode 😎' };
+  const MOODS = { neutral: 'Ready to pasken…', happy: 'Yasher koach!', sad: 'Oy. Try again.', thinking: 'Hmm, a kasha…', sunglasses: 'Bein Hazmanim mode 😎' };
   function avatarCfg() {
     if (!AV) return null;
     return AV.sanitize((state.avatar && state.avatar.config) || AV.defaultConfig());
@@ -12936,6 +13271,8 @@ body.golem-growl::after {
     $('#stars-val').textContent = '★ ' + totalStars();
     $('#bonus-val').textContent = '✦ ' + bonusStars();
     $('#tokens-val').textContent = '🎟️ ' + state.tokens;
+    $('#spend-val').textContent = '🪙 ' + xpToSpend() + ' to spend';
+    enforceOwned(); notifyEarned();
     $('#act-progress').innerHTML = actList().map(a => {
       const ls = actLevels(a), done = ls.filter(l => isSolved(l.n)).length;
       return `<div class="act-prog"><span>${a}. ${esc((S.acts[a] || {}).name || 'Act ' + a)}</span><span class="ap-bar"><span style="width:${(done / ls.length * 100).toFixed(0)}%"></span></span><span class="ap-num">${done}/${ls.length}</span></div>`;
@@ -13032,7 +13369,7 @@ body.golem-growl::after {
     container.innerHTML = `<div class="editor">
       <div class="ed-titlebar"><span class="dot r"></span><span class="dot y"></span><span class="dot g"></span><span class="ed-label">${esc(opts.label || 'mesorah_db.sql')}</span><span class="ed-keys">Ctrl/⌘+Enter run · Tab complete${opts.history !== false ? ' · Ctrl+↑ history' : ''}</span></div>
       <div class="ed-body ${opts.small ? 'small' : ''}"><div class="ed-lines" aria-hidden="true">1</div><div class="ed-wrap"><pre class="ed-hl" aria-hidden="true"></pre>
-      <textarea class="ed-ta" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="SQL query editor" aria-autocomplete="list" placeholder="-- Type your SQL here…"></textarea>
+      <textarea class="ed-ta" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="SQL query editor" aria-autocomplete="list" placeholder="-- Nu, type your SQL here…"></textarea>
       <ul class="ac-pop" role="listbox" hidden></ul></div></div></div>`;
     const ta = $('.ed-ta', container), hl = $('.ed-hl', container), ln = $('.ed-lines', container), pop = $('.ac-pop', container);
     let ac = { items: [], i: 0, start: 0, open: false };
@@ -13276,13 +13613,15 @@ body.golem-growl::after {
     const done = !!state.daily[p.date];
     const stars = '◆'.repeat(p.difficulty) + '◇'.repeat(3 - p.difficulty);
     return `<div class="daf-card ${done ? 'done' : ''}"><span class="daf-ico">📅</span><div><strong>Daf SQL · ${esc(p.dayName || '')}</strong> <span class="daf-diff" title="Difficulty">${stars}</span>
-      <p>${esc(p.title)}${done ? ' — <em>solved today ✓</em>' : ''}</p></div><button class="btn btn-sm" data-daf="1">${done ? 'Review' : 'Solve today\'s puzzle'}</button></div>`;
+      <p>${esc(p.title)}${done ? ' — <em>solved today ✓ shkoyach!</em>' : ''}</p></div><button class="btn btn-sm" data-daf="1">${done ? 'Review' : 'Solve today\'s puzzle'}</button></div>`;
   }
   function wireDaf(root) { $$('[data-daf]', root).forEach(b => b.addEventListener('click', screenDaily)); }
 
   /* ---------- title ---------- */
   function screenTitle() {
     const has = state.started && (state.player || state.name);
+    const dir = profileDir();
+    const others = Object.keys(dir.list).filter(id => id !== state.profileKey);
     const cal = calInfo();
     const candle = cal && cal.yomTov === 'Chanuka' ? '🕎' : cal && cal.yomTov === 'Purim' ? '🎭' : cal && (cal.isShabbos || cal.isErevShabbos) ? '🕯️🕯️' : '🕯️';
     show('title', `<section class="card title-card">
@@ -13292,24 +13631,61 @@ body.golem-growl::after {
       ${cal && cal.hebrew ? `<p class="heb-line">${esc(cal.hebrew)}${cal.greeting ? ' · ' + esc(cal.greeting) : ''}</p>` : ''}
       <div class="ornament">✦ ✦ ✦</div>
       <div class="title-buttons">
-        ${has ? `<button class="btn btn-primary" id="t-continue">Continue as ${esc(displayName())} ➜</button>` : ''}
-        <button class="btn ${has ? '' : 'btn-primary'}" id="t-new">${has ? 'Start a new zman' : 'Begin the zman ➜'}</button>
+        ${has ? `<button class="btn btn-primary" id="t-continue">Continue as ${esc(displayName())} ➜${resumeN() ? ` <small>· Level ${resumeN()}</small>` : ''}</button>` : ''}
+        ${others.length ? `<button class="btn" id="t-switch">👥 Not ${esc(state.player ? state.player.first : 'you')}? Sign in</button>` : ''}
+        <button class="btn ${has ? '' : 'btn-primary'}" id="t-new">${has ? '➕ New bochur — begin a zman' : 'Begin the zman ➜'}</button>
         <button class="btn" id="t-code">🗝️ Enter a passage code</button>
         <button class="btn btn-quiet" id="t-teacher">👩‍🏫 Teacher</button>
       </div>
       ${has ? dafCard() : ''}
-      <p class="muted small">61 levels · 4 farhers · 11 endings · secrets hidden everywhere. Progress saves automatically in this browser. <span class="version-tag">${GAME_VERSION}</span></p>
-      ${state.migrated ? '<p class="muted small">Your progress from the earlier version came with you. Welcome back!</p>' : ''}
+      <p class="muted small">61 levels · 4 farhers · 11 endings · secrets hidden everywhere. Progress saves automatically in this browser — one save per bochur. <span class="version-tag">${GAME_VERSION}</span></p>
+      ${state.migrated ? '<p class="muted small">Your progress from the earlier version came with you. Welcome back, takeh!</p>' : ''}
+      ${storageWorks ? '' : '<p class="warn-box small">⚠️ Nu, careful: this browser window can\'t save your progress (a private window or a blocked page). Before you leave, open ⚙️ Settings and copy your <strong>progress code</strong> — paste it back next time.</p>'}
     </section>`);
     mood('kumzitz');
     if (has) $('#t-continue').onclick = () => continueGame();
-    $('#t-new').onclick = () => {
-      if (has) modal({ title: 'Start over?', html: '<p>This erases your saved progress in this browser. (You can copy a progress code from Settings first.)</p>', buttons: [{ label: 'Cancel' }, { label: 'Yes, start over', cls: 'btn-danger', onClick: () => resetAll() }] });
-      else screenSetup('new');
-    };
+    // v3.3: a new bochur no longer erases the last one — every save stays on this computer under its name.
+    $('#t-new').onclick = () => { if (has) freshState(); screenSetup('new'); };
+    const sw = $('#t-switch'); if (sw) sw.onclick = () => openSignIn();
     $('#t-code').onclick = () => promptPassage();
     $('#t-teacher').onclick = () => promptTeacher();
     wireDaf($('#main'));
+  }
+  function freshState() {
+    const st = state.settings; state = defaultState(); state.settings = st; state.settings.teacher = false;
+    applyPlayer(); if (hasStory()) { try { S.story.load(undefined); } catch (e) {} }
+    refreshSidebar(); avatar('neutral');
+  }
+  // Where "Continue" picks up: the level you were on, or the next one you haven't solved yet.
+  function resumeN() {
+    if (!state.started) return null;
+    const ns = levelNs(); const last = state.lastLevel;
+    if (last && ns.includes(last) && !isSolved(last) && isUnlocked(last)) return last;
+    const from = last && ns.includes(last) ? ns.indexOf(last) : 0;
+    for (let i = from; i < ns.length; i++) if (!isSolved(ns[i]) && isUnlocked(ns[i])) return ns[i];
+    return null;
+  }
+  function profileSummary(p) {
+    return `${p.solved || 0} level${p.solved === 1 ? '' : 's'} · ${p.stars || 0} ★${p.last ? ' · last at Level ' + p.last : ''}`;
+  }
+  // "Who's learning?" — every bochur who has played on this computer.
+  function openSignIn() {
+    const dir = profileDir();
+    const ids = Object.keys(dir.list).sort((a, b) => (dir.list[b].at || 0) - (dir.list[a].at || 0));
+    const m = modal({
+      title: '👥 Who is learning now?', html: `<p>Pick your name to continue exactly where you stopped.</p>
+        <div class="profile-list">${ids.map(id => `<div class="profile-row"><button class="btn profile-pick" data-id="${esc(id)}"><strong>${esc(dir.list[id].name)}</strong><span class="muted small">${esc(profileSummary(dir.list[id]))}</span></button>
+          <button class="btn btn-quiet btn-sm profile-del" data-id="${esc(id)}" aria-label="Erase ${esc(dir.list[id].name)}'s save" title="Erase this save">🗑</button></div>`).join('')}</div>
+        <p class="muted small">Not on the list? Close this and press <em>New bochur</em> — if your name was used here before, you'll be asked if you want to continue.</p>`,
+      buttons: [{ label: 'Close' }],
+    });
+    $$('.profile-pick', m.el).forEach(b => b.onclick = () => { m.close(); if (loadProfile(b.dataset.id)) { refreshSidebar(); toast(`👋 Welcome back, ${esc(displayName())}! Shkoyach for coming back.`, 'good'); continueGame(); } else toast('Nu, that save could not be opened.', 'bad'); });
+    $$('.profile-del', m.el).forEach(b => b.onclick = () => {
+      const id = b.dataset.id, nm = (dir.list[id] || {}).name || '';
+      m.close();
+      modal({ title: 'Erase this save?', html: `<p>Erase <strong>${esc(nm)}</strong>'s progress on this computer? This can't be undone. (Copy a progress code from ⚙️ Settings first if you might need it.)</p>`,
+        buttons: [{ label: 'Cancel', onClick: () => openSignIn() }, { label: 'Erase', cls: 'btn-danger', onClick: () => { deleteProfile(id); if (state.profileKey === id) { Store.del(SAVE_KEY); freshState(); } screenTitle(); } }] });
+    });
   }
   function resetAll(toTitle) {
     const st = state.settings; state = defaultState(); state.settings = st; state.settings.teacher = false;
@@ -13322,7 +13698,9 @@ body.golem-growl::after {
     if (trapped()) return screenAttic();
     if (!state.player && !state.name) return screenSetup('new');
     if (!state.player && T) return screenSetup('upgrade');
+    const n = resumeN();
     screenMap();
+    if (n) openLevel(n);
   }
 
   function promptPassage(after) {
@@ -13331,9 +13709,9 @@ body.golem-growl::after {
       buttons: [{ label: 'Cancel' }, { label: 'Unlock', cls: 'btn-primary', close: false, onClick: el => {
         const v = $('#pc-in', el).value.trim();
         const act = Object.keys(ACT_CODES).find(a => ACT_CODES[a] === v);
-        if (!act) { $('.pc-err', el).textContent = 'The gates remain closed. Check the code with your teacher.'; $('.modal', el).classList.add('shake'); setTimeout(() => $('.modal', el) && $('.modal', el).classList.remove('shake'), 500); return; }
+        if (!act) { $('.pc-err', el).textContent = 'Nu, the gates stay closed. Check the code with your teacher.'; $('.modal', el).classList.add('shake'); setTimeout(() => $('.modal', el) && $('.modal', el).classList.remove('shake'), 500); return; }
         state.unlockedAct = Math.max(state.unlockedAct, +act); save(); m.close();
-        toast(`🗝️ Act ${act} — ${esc((S.acts[act] || {}).name || '')} is open.`, 'good');
+        toast(`🗝️ Act ${act} — ${esc((S.acts[act] || {}).name || '')} is open. Geshmak!`, 'good');
         if (after) after(); else if (!state.player) screenSetup('new'); else screenMap(+act);
       } }],
     });
@@ -13346,7 +13724,7 @@ body.golem-growl::after {
       buttons: [{ label: 'Cancel' }, { label: 'Enter', cls: 'btn-primary', close: false, onClick: el => {
         if ($('#tc-in', el).value.trim() !== TEACHER_CODE) { $('.tc-err', el).textContent = 'That is not the teacher code.'; return; }
         state.settings.teacher = true; state.started = true;
-        if (!state.player) { state.player = { first: 'Morah', family: '', nick: '', address: 'first', shiur: 'Shiur Beis', dorm: 'Aleph', room: 206, masechta: 'Kiddushin', personality: 'chesed' }; state.name = 'Morah'; applyPlayer(); }
+        if (!state.player) { state.player = { first: 'Morah', family: '', nick: '', address: 'first', shiur: 'Shiur Beis', dorm: 'Aleph', room: 206, masechta: 'Kiddushin', personality: 'chesed', teacherDemo: true }; state.name = 'Morah'; applyPlayer(); }
         save(); m.close(); refreshSidebar();
         toast('👩‍🏫 Teacher mode on: all levels open.', 'good'); trapped() ? screenAttic() : screenMap();
       } }],
@@ -13434,7 +13812,7 @@ body.golem-growl::after {
     // Each box gets its own message, right under it (student feedback: the old message named the wrong box).
     function nameProblem(v, kind) {
       if (S.nameProblem) return S.nameProblem(v, kind);
-      if (!v) return kind === 'first' ? 'Please type your first name.' : null;
+      if (!v) return kind === 'first' ? 'Nu, please type your first name.' : null;
       return /^[A-Za-z][A-Za-z' .\-]{1,15}$/.test(v) ? null : 'Use 2–16 letters only.';
     }
     function validateNames() {
@@ -13460,18 +13838,43 @@ body.golem-growl::after {
       if (step === 1) {
         captureInputs();
         if (!validateNames()) return;
+        // v3.3: same name as a save on this computer → offer to continue from there.
+        if (mode === 'new' && !draft.twin && !draft.askedSame) {
+          const same = profilesFor(draft.first, draft.family).filter(pr => pr.id !== state.profileKey || !state.started);
+          if (same.length) { welcomeBack(same); return; }
+        }
       }
       if (step < 3) { step++; render(); return; }
       finish();
     }
+    function welcomeBack(same) {
+      const nm = esc(displayNameOf(draft));
+      const m = modal({
+        title: `👋 Welcome back, ${nm}!`,
+        html: `<p>${same.length > 1 ? 'There are saves with your name on this computer.' : 'There is a save with your name on this computer.'} Pick yours to continue exactly where you stopped:</p>
+          <div class="profile-list">${same.map(pr => `<button class="btn btn-primary profile-pick" data-id="${esc(pr.id)}"><strong>Continue as ${esc(pr.name)} ➜</strong><span class="small">${esc(profileSummary(pr))}</span></button>`).join('')}</div>`,
+        buttons: [{ label: `I'm a different ${esc(draft.first)} — start fresh`, onClick: () => { draft.twin = same.length + 1; while (profileDir().list[nameKey(draft.first, draft.family) + '#' + draft.twin]) draft.twin++; step++; render(); } }],
+      });
+      $$('.profile-pick', m.el).forEach(b => b.onclick = () => {
+        m.close();
+        if (loadProfile(b.dataset.id)) { refreshSidebar(); avatar('happy', 2500); toast(`👋 Shkoyach for coming back, ${esc(S.fill ? S.fill('{Name}') : draft.first)}! Picking up where you left off.`, 'good'); continueGame(); }
+        else toast('Nu, that save could not be opened.', 'bad');
+      });
+    }
     function finish() {
       const p = Object.assign({}, draft, { room: +draft.room });
+      delete p.askedSame; if (!p.twin) delete p.twin;
+      const oldKey = state.profileKey;
       state.player = p; state.name = displayNameOf(p); state.started = true;
+      // A renamed bochur keeps his save; it just moves to the new name (unless that name is already taken here).
+      const newKey = profileKeyOf(p);
+      if (oldKey && oldKey !== newKey && !profileDir().list[newKey]) { deleteProfile(oldKey); state.profileKey = newKey; }
+      else if (!oldKey) state.profileKey = profileDir().list[newKey] && mode === 'new' ? newKey + '#' + Date.now().toString(36) : newKey;
       if (!state.avatar) state.avatar = { config: cfg, owned: [] }; else state.avatar.config = cfg;
       applyPlayer(); checkWardrobe(); save(); refreshSidebar(); avatar('happy', 2500);
       Eggs.emit({ type: 'name', name: p.first });
       if (mode === 'new') screenBackstory();
-      else { toast('✓ Saved. ' + esc(S.fill ? S.fill('{Name}') : p.first) + ', you look like a real Gabbai HaData.', 'good'); screenMap(); }
+      else { toast('✓ Saved. Yasher koach, ' + esc(S.fill ? S.fill('{Name}') : p.first) + ' — you look like a real Gabbai HaData.', 'good'); screenMap(); }
     }
     render();
   }
@@ -13529,11 +13932,13 @@ body.golem-growl::after {
         : canGuess ? `<div class="riddle-row"><label class="sr-only" for="b-guess">Your answer to the riddle</label>
             <input id="b-guess" class="text-in riddle-in" type="text" maxlength="40" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type your answer…">
             <button type="button" class="btn btn-sm" id="b-guess-btn">Answer</button></div><p class="riddle-out" role="status"></p>`
+        : item && item.unlock && item.unlock.type === 'shop' ? '<div class="row-btns"><button type="button" class="btn btn-sm" id="b-canteen">🛒 Open the Canteen</button></div>'
         : '<p class="muted small">Keep playing to earn this one.</p>'}</div>`;
+      const cb = $('#b-canteen', box); if (cb) cb.onclick = () => { $$('.modal-wrap').forEach(w => w.remove()); openCanteen('wear'); };
       const inp = $('#b-guess', box); if (!inp) return;
       const go = () => {
         const g = inp.value.trim(); const out = $('.riddle-out', box);
-        if (!g) { out.textContent = 'Type a word first, then press Answer.'; inp.focus(); return; }
+        if (!g) { out.textContent = 'Nu, type a word first, then press Answer.'; inp.focus(); return; }
         let res = null; try { res = AV.checkRiddle(id, g); } catch (e) { res = null; }
         if (res && res.correct) {
           state.riddles = state.riddles || {};
@@ -13543,7 +13948,7 @@ body.golem-growl::after {
           save();
           box.querySelector('.riddle-card').innerHTML = `<p class="riddle-q">🔒 <strong>${esc(item.label)}</strong></p><p class="riddle-how">✓ <strong>Kiven!</strong> ${esc(res.how || 'That\'s it.')}${first ? ' <span class="muted">+5 XP</span>' : ''}</p>`;
         } else {
-          out.textContent = (res && res.hint) || 'Not that one. Read the riddle again, word by word.';
+          out.textContent = (res && res.hint) || 'Not that one — nu, read the riddle again, word by word.';
           inp.select();
         }
       };
@@ -13615,7 +14020,7 @@ body.golem-growl::after {
       <div class="map-head"><h2 data-egg="map-title" class="clickable">🗺️ The Zman${(state.run || 1) > 1 ? ` <span class="run-tag">New Zman+ · run ${state.run}</span>` : ''}</h2>
         <div class="map-actions">${state.finale || teacher() ? '<button class="btn" id="m-sandbox">🕯️ Beis Medrash free-play</button>' : ''}<button class="btn btn-quiet" id="m-code">🗝️ Passage code</button></div></div>
       ${dafCard()}
-      <p class="muted">Solve each level to open the next. Stars: ★★★ = no paid hints and within 3 tries. ✦ = solved another way. ◆ = farher.</p>
+      <p class="muted">Solve each level to open the next — keep shteiging. Stars: ★★★ = no paid hints and within 3 tries. ✦ = solved another way. ◆ = farher.</p>
       ${pieces}</section>`);
     mood('kumzitz');
     setStatus(`${displayName()} · Map`);
@@ -13746,7 +14151,7 @@ body.golem-growl::after {
     if (trapped()) { toast('🕯️ The attic door is still shut behind you…', 'bad'); return screenAttic(); }
     const level = S.levelByN(n);
     if (!level) return screenMap();
-    if (!isUnlocked(n)) { toast('🔒 Solve the level before it first.', 'bad'); return; }
+    if (!isUnlocked(n)) { toast('🔒 Nu, finish the level before this one first.', 'bad'); return; }
     if (!opts.noScene && maybeScene({ type: 'beforeLevel', n }, () => openLevel(n, { noScene: true }))) return;
     if (trapped()) return screenAttic();
     if (level.branch && level.variants && !state.path[level.branch.id]) return chooseBranch(level, () => openLevel(n, { noScene: true }));
@@ -13805,7 +14210,7 @@ body.golem-growl::after {
           <div id="editor-box"></div>
           <div class="controls">
             <button class="btn btn-primary" id="run-btn">▶ Paskan query</button>
-            <button class="btn" id="hint-btn">💡 Hint</button>
+            <button class="btn" id="hint-btn">💡 Hint (a remez)</button>
             <button class="btn btn-quiet" id="ask-btn" title="Ask Reb Tuvia a question">🙋 Ask Reb Tuvia</button>
             <button class="btn btn-quiet" id="explain-btn" title="Read my query in plain English">🗣️ Explain my query</button>
             <button class="btn btn-quiet" id="steps-btn" title="Row counts after each clause">🧮 How SQL ran this</button>
@@ -14020,7 +14425,7 @@ body.golem-growl::after {
       $$('.kc', pane).forEach((x, j) => { x.disabled = true; x.classList.toggle('right', j === k.correct); x.classList.toggle('wrong', j === i && !ok); });
       if (state.tutor.kasha[cur.n] === undefined) { state.tutor.kasha[cur.n] = ok; save(); }
       const r = runRead(k.sql);
-      $('#kasha-out').innerHTML = `<div class="fb ${ok ? 'good' : 'bad'}"><div class="fb-icon">${ok ? '✓' : '✗'}</div><div>${ok ? '<strong>Kiven!</strong> You saw it before it ran.' : `<strong>Not quite</strong> — it's <strong>${esc(k.choices[k.correct])}</strong>. Look at the rows below and see why.`}</div></div>` + (r.error ? '' : tableHtml(r, { max: 30 }));
+      $('#kasha-out').innerHTML = `<div class="fb ${ok ? 'good' : 'bad'}"><div class="fb-icon">${ok ? '✓' : '✗'}</div><div>${ok ? '<strong>Kiven!</strong> You saw it before it ran.' : `<strong>Nu, not quite</strong> — it's <strong>${esc(k.choices[k.correct])}</strong>. Look at the rows below and see why.`}</div></div>` + (r.error ? '' : tableHtml(r, { max: 30 }));
       $('#kasha-next').hidden = false; $('#kasha-next').focus();
       Sound.play(ok ? 'clink' : 'pop'); avatar(ok ? 'happy' : 'thinking', 2500);
     });
@@ -14049,7 +14454,7 @@ body.golem-growl::after {
       let g; try { g = T.checkStep(cur.L, i, sql); } catch (e) { g = { pass: false, msg: e.message }; }
       $('#cv-res').innerHTML = g.shown ? tableHtml(g.shown, { max: 40 }) : '';
       if (g.pass) {
-        $('#cv-fb').innerHTML = `<div class="fb good"><div class="fb-icon">✓</div><div><strong>${i + 1 < steps.length ? 'Good — next step.' : 'That\'s the whole shaila!'}</strong></div></div>`;
+        $('#cv-fb').innerHTML = `<div class="fb good"><div class="fb-icon">✓</div><div><strong>${i + 1 < steps.length ? 'Shkoyach — next step.' : 'Yasher koach — that\'s the whole shaila!'}</strong></div></div>`;
         Sound.play('pop');
         setTimeout(() => {
           if (i + 1 < steps.length) { cur.stepI = i + 1; renderChavrusa(pane); }
@@ -14057,7 +14462,7 @@ body.golem-growl::after {
         }, reducedMotion() ? 0 : 650);
       } else {
         let d = null; try { d = T.diagnose(sql, Object.assign({}, cur.L, { answer: st.answer }), g); } catch (e) { d = null; }
-        $('#cv-fb').innerHTML = `<div class="fb bad"><div class="fb-icon">✗</div><div>${fmt(g.msg || 'Not yet.')}${d ? `<div class="diag"><strong>🧓 ${esc(d.title)}</strong> ${d.html}</div>` : ''}</div></div>`;
+        $('#cv-fb').innerHTML = `<div class="fb bad"><div class="fb-icon">✗</div><div>${fmt(g.msg || 'Not yet — nu, try again.')}${d ? `<div class="diag"><strong>🧓 ${esc(d.title)}</strong> ${d.html}</div>` : ''}</div></div>`;
       }
     }
     $('#cv-run').onclick = run;
@@ -14068,10 +14473,10 @@ body.golem-growl::after {
   /* ---------- explain / steps panels ---------- */
   function toolsPanel(kind) {
     const out = $('#tools-out'); const sql = cur.editor.value.trim();
-    if (!sql) { out.hidden = false; out.innerHTML = '<p class="muted">Type a query first, then I can read it to you.</p>'; return; }
+    if (!sql) { out.hidden = false; out.innerHTML = '<p class="muted">Nu, type a query first, then I can read it to you.</p>'; return; }
     if (kind === 'explain') {
       let h = null; try { h = T && T.explain(sql); } catch (e) { h = null; }
-      out.innerHTML = `<div class="tools-head">🗣️ Your query, in plain words</div>` + (h ? `<p>${h}</p>` : '<p class="muted">This one is too fancy for me to read aloud — try "How SQL ran this", or run it and look at the rows.</p>');
+      out.innerHTML = `<div class="tools-head">🗣️ Your query, in plain words</div>` + (h ? `<p>${h}</p>` : '<p class="muted">Nu, this one is too fancy for me to read aloud — try "How SQL ran this", or run it and look at the rows.</p>');
     } else {
       let st = null; try { st = T && T.steps(sql); } catch (e) { st = null; }
       if (!st || !st.length) out.innerHTML = '<div class="tools-head">🧮 How SQL ran this</div><p class="muted">I can only take apart simple queries step by step. (Subqueries and WITH are too twisty for this view.)</p>';
@@ -14108,7 +14513,7 @@ body.golem-growl::after {
       if (!isSolved(cur.n) && !cur.paid) {
         const useToken = state.tokens > 0;
         return modal({
-          title: '💡 Fill-in-the-blank hint',
+          title: '💡 Fill-in-the-blank hint (a bigger remez)',
           html: useToken ? `<p>Use one of your 🎟️ hint tokens (you have ${state.tokens})? No star lost.</p>` : '<p>This hint shows the shape of the answer. It costs <strong>one star</strong> for this level.</p>',
           buttons: [{ label: 'Not yet' }, { label: useToken ? 'Use a token' : 'Show it (−1 ★)', cls: 'btn-primary', onClick: () => {
             if (useToken) { state.tokens--; cur.tokenUsed = true; } else cur.paid = true;
@@ -14128,18 +14533,18 @@ body.golem-growl::after {
   }
   function renderHints() {
     const hints = cur.L.hints || [];
-    const labels = ['Nudge', 'Example', 'Fill in the blank'];
+    const labels = ['A remez', 'Example', 'Fill in the blank'];
     const box = $('#hint-box');
     box.hidden = cur.hintStep === 0;
     box.innerHTML = `<div class="hint-face">🧓</div><div>${hints.slice(0, cur.hintStep).map((h, i) => `<p><span class="hint-tag">${labels[i]}</span> ${fill(h)}</p>`).join('')}</div>`;
-    $('#hint-btn').textContent = cur.hintStep >= 3 ? '💡 No more hints' : cur.hintStep === 2 ? '💡 Hint 3 (costs ★)' : `💡 Hint ${cur.hintStep + 1}`;
+    $('#hint-btn').textContent = cur.hintStep >= 3 ? '💡 No more remazim' : cur.hintStep === 2 ? '💡 Hint 3 (costs ★)' : `💡 Hint ${cur.hintStep + 1} (a remez)`;
     if (cur.hintStep >= 3) $('#hint-btn').disabled = true;
   }
 
   function showAnswer() {
     modal({
       title: '👁 Show the answer?', html: '<p>Rabbi Gold will write the answer into your editor. You still have to run it yourself, and this level will earn <strong>no stars and no XP</strong>. Sometimes seeing it is how we learn — just read it carefully.</p>',
-      buttons: [{ label: 'Keep trying' }, { label: 'Show me', cls: 'btn-danger', onClick: () => {
+      buttons: [{ label: 'Keep trying — bli neder' }, { label: 'Show me', cls: 'btn-danger', onClick: () => {
         cur.shown = true; cur.editor.value = cur.L.answer.replace(/\s+(FROM|WHERE|GROUP BY|HAVING|ORDER BY|LIMIT|JOIN|LEFT JOIN|UNION|SET)\b/g, '\n$1');
         if (!isSolved(cur.n)) { const lg = state.log[cur.n] = state.log[cur.n] || {}; lg.answerShown = true; save(); }
         cur.editor.focus(); say('gold', 'Read it slowly, {name}. Every word has a reason. Then press <strong>Paskan</strong>.');
@@ -14162,7 +14567,7 @@ body.golem-growl::after {
     avatar('thinking');
     remember(sql);
     let g;
-    try { g = S.grade(L, sql); } catch (e) { console.error(e); g = { pass: false, kind: 'error', msg: 'Something went wrong inside the game. Tell your teacher: ' + e.message }; }
+    try { g = S.grade(L, sql); } catch (e) { console.error(e); g = { pass: false, kind: 'error', msg: 'A kasha in the game itself, not in your query. Tell your teacher: ' + e.message }; }
     cur.lastG = g;
     const already = isSolved(cur.n);
     const res = g.shown || null;
@@ -14182,9 +14587,9 @@ body.golem-growl::after {
         delete state.attempts[cur.n];
         const offerSkip = tutorAfterSolve(lg.firstTry);
         save(); refreshSidebar();
-        const line = (L.success && L.success.length) ? L.success[Math.floor(Math.random() * L.success.length)] : 'Yashar koach!';
+        const line = (L.success && L.success.length) ? L.success[Math.floor(Math.random() * L.success.length)] : 'Shkoyach!';
         fb.innerHTML = `<div class="fb good"><div class="fb-stars" aria-label="${stars} stars">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
-          <div><strong>Correct!</strong> +${xp} XP${stars < 3 && !cur.shown ? ` <span class="muted small">(${cur.paid ? 'paid hint' : ''}${cur.paid && cur.attempts + 1 > 3 ? ' · ' : ''}${cur.attempts + 1 > 3 ? (cur.attempts + 1) + ' tries' : ''})</span>` : ''}${cur.shown ? ' <span class="muted small">(answer was shown)</span>' : ''}<p>${fill(line)}</p></div></div>`;
+          <div><strong>Yasher koach! Correct.</strong> +${xp} XP${stars < 3 && !cur.shown ? ` <span class="muted small">(${cur.paid ? 'paid hint' : ''}${cur.paid && cur.attempts + 1 > 3 ? ' · ' : ''}${cur.attempts + 1 > 3 ? (cur.attempts + 1) + ' tries' : ''})</span>` : ''}${cur.shown ? ' <span class="muted small">(answer was shown)</span>' : ''}<p>${fill(line)}</p></div></div>`;
         if (offerSkip) renderSkipOffer();
         Sound.play('clink'); avatar('happy', 4000); windowsFlash(); confetti();
         cur.newSolve = true;
@@ -14194,7 +14599,7 @@ body.golem-growl::after {
       } else {
         const better = computeStars() > state.solved[cur.n];
         if (better) { state.solved[cur.n] = computeStars(); save(); refreshSidebar(); }
-        fb.innerHTML = `<div class="fb good"><div class="fb-stars">${'★'.repeat(state.solved[cur.n])}${'☆'.repeat(3 - state.solved[cur.n])}</div><div><strong>Correct again.</strong> ${better ? 'Your stars went up!' : ''} <span class="muted">Already solved — no extra points.</span></div></div>`;
+        fb.innerHTML = `<div class="fb good"><div class="fb-stars">${'★'.repeat(state.solved[cur.n])}${'☆'.repeat(3 - state.solved[cur.n])}</div><div><strong>Correct again — gevaldig.</strong> ${better ? 'Your stars went up!' : ''} <span class="muted">Already solved — no extra points.</span></div></div>`;
         avatar('happy', 2500);
         save(); checkAchievements({ type: 'resolve', levelN: cur.n });
       }
@@ -14214,12 +14619,12 @@ body.golem-growl::after {
         save();
       }
       let d = null; try { d = T && T.diagnose(sql, L, g); } catch (e) { d = null; }
-      fb.innerHTML = `<div class="fb bad"><div class="fb-icon">✗</div><div>${fmt(g.msg)}${g.kind === 'error' && g.raw ? `<details class="raw"><summary>SQLite's exact words</summary><code>${esc(g.raw)}</code></details>` : ''}
+      fb.innerHTML = `<div class="fb bad"><div class="fb-icon">✗</div><div>${g.kind === 'error' ? '<strong>A kasha on this query:</strong> ' : '<strong>Nu, try again.</strong> '}${fmt(g.msg)}${g.kind === 'error' && g.raw ? `<details class="raw"><summary>SQLite's exact words</summary><code>${esc(g.raw)}</code></details>` : ''}
         ${d ? `<div class="diag"><strong>🧓 ${esc(d.title)}</strong> ${d.html}</div>` : ''}</div></div>`;
       Sound.play('sigh'); avatar('sad', 3000);
       updateAnswerBtn();
       if ((cur.attempts >= 3 || already) && g.shown && g.expected && T && T.diffRows && g.kind !== 'error') renderDiff(g);
-      if (cur.attempts === 3 && !already && !teacher()) fb.insertAdjacentHTML('beforeend', '<p class="fb-note">🧓 Rabbi Gold: "Three tries. Look at the row comparison below, try a hint — or, if you really need it, you can now see the answer."</p>');
+      if (cur.attempts === 3 && !already && !teacher()) fb.insertAdjacentHTML('beforeend', '<p class="fb-note">🧓 Rabbi Gold: "Nu, three tries. Look at the row comparison below, try a hint — or, if you really need it, you can now see the answer."</p>');
       if (g.kind === 'toomany' && cur.n >= 49) {
         const r = storyEvent('runaway', { n: cur.n });
         const lvl = cur.n;
@@ -14251,10 +14656,10 @@ body.golem-growl::after {
   }
   function renderSkipOffer() {
     const act = cur.L.act;
-    $('#feedback').insertAdjacentHTML('beforeend', `<div class="skip-offer" id="skip-offer"><strong>⚡ Three in a row, first try!</strong> Rabbi Gold: "${esc(S.fill ? S.fill('{Name}') : 'Bochur')}, you don't need me to walk you through every step. Straight to the shaila for the rest of ${esc((S.acts[act] || {}).name || 'this act')}?"
+    $('#feedback').insertAdjacentHTML('beforeend', `<div class="skip-offer" id="skip-offer"><strong>⚡ Three in a row, first try — shkoyach!</strong> Rabbi Gold: "${esc(S.fill ? S.fill('{Name}') : 'Bochur')}, you don't need me to walk you through every step. Straight to the shaila for the rest of ${esc((S.acts[act] || {}).name || 'this act')}?"
       <span class="muted small">The Shiur, Kasha and Chavrusa stay one click away. If an idea trips you up twice, the teaching comes back.</span>
       <div class="row-btns"><button class="btn btn-sm btn-primary" id="so-yes">Straight to the task ⚡</button><button class="btn btn-sm btn-quiet" id="so-no">Keep teaching me</button></div></div>`);
-    $('#so-yes').onclick = () => { state.tutor.skipActs[act] = true; save(); $('#skip-offer').innerHTML = '⚡ Done — straight to the shaila for the rest of this act.'; };
+    $('#so-yes').onclick = () => { state.tutor.skipActs[act] = true; save(); $('#skip-offer').innerHTML = '⚡ Geshmak — straight to the shaila for the rest of this act.'; };
     $('#so-no').onclick = () => { $('#skip-offer').remove(); };
   }
 
@@ -14282,10 +14687,10 @@ body.golem-growl::after {
         let r; try { r = T.another(L, sql); } catch (e) { r = { pass: false, msg: e.message }; }
         if (r.pass) {
           if (!state.another[cur.n]) { state.another[cur.n] = true; const ways = state.ways[cur.n] = state.ways[cur.n] || []; if (!ways.includes(sql.trim())) ways.push(sql.trim()); save(); refreshSidebar(); }
-          toast('✦ Bonus star! ' + esc(r.msg || 'Two derachim, one emes.'), 'good'); Sound.play('clink'); confetti();
+          toast('✦ Bonus star — shkoyach! ' + esc(r.msg || 'Two derachim, one emes.'), 'good'); Sound.play('clink'); confetti();
           checkAchievements({ type: 'another', levelN: cur.n });
           renderPshat();
-        } else $('#an-fb').innerHTML = `<div class="fb bad"><div class="fb-icon">✗</div><div>${fmt(r.msg || 'Not yet.')}</div></div>`;
+        } else $('#an-fb').innerHTML = `<div class="fb bad"><div class="fb-icon">✗</div><div>${fmt(r.msg || 'Not yet — nu, try again.')}</div></div>`;
       }
       $('#an-run').onclick = runAnother;
     }
@@ -14347,15 +14752,15 @@ body.golem-growl::after {
     const raw = $('#trivia-in').value;
     const v = parseNumberWords(raw);
     const out = $('#trivia-out');
-    if (v === null) { const m = raw.trim() ? 'That isn\'t a number I can read. Type it in digits (12) or words (twelve).' : 'Type your answer first — a number, like 12 or twelve.'; if (out) out.textContent = m; else toast(m, 'bad'); $('#trivia-in').focus(); return; }
+    if (v === null) { const m = raw.trim() ? 'Nu, that isn\'t a number I can read. Type it in digits (12) or words (twelve).' : 'Type your answer first — a number, like 12 or twelve.'; if (out) out.textContent = m; else toast(m, 'bad'); $('#trivia-in').focus(); return; }
     if (out) out.textContent = '';
     const ok = v === cur.trivia[1];
     Eggs.emit({ type: 'trivia', correct: ok, answer: v });
     if (ok) {
-      if (state.tokenLevels[cur.n] || state.tokens >= 3) toast(`✓ ${v} is right! ${state.tokens >= 3 ? 'Your token pouch is full (3).' : 'One token per level, though.'}`, 'good');
-      else { state.tokens++; state.tokenLevels[cur.n] = 1; save(); refreshSidebar(); toast(`✓ ${v} is right! +1 🎟️ hint token. Use it for a free fill-in-the-blank hint.`, 'good'); Sound.play('pop'); }
+      if (state.tokenLevels[cur.n] || state.tokens >= 3) toast(`✓ ${v} is right — shkoyach! ${state.tokens >= 3 ? 'Your token pouch is full (3).' : 'One token per level, though.'}`, 'good');
+      else { state.tokens++; state.tokenLevels[cur.n] = 1; save(); refreshSidebar(); toast(`✓ ${v} is right — yasher koach! +1 🎟️ hint token. Use it for a free fill-in-the-blank hint.`, 'good'); Sound.play('pop'); }
     } else toast(`Nu nu… not ${v}. Here's another one.`, 'bad');
-    if (out) out.textContent = ok ? `✓ ${v} — correct!` : `Not ${v}. Here's a new question.`;
+    if (out) out.textContent = ok ? `✓ ${v} — correct! Shkoyach!` : `Not ${v} — nu, here's a new question.`;
     newTrivia();
   }
 
@@ -14378,7 +14783,7 @@ body.golem-growl::after {
       state.chazaraRounds.push({ at: c, score: R.score, of: qs.length });
       const xp = R.score * 10; state.xp += xp;
       save(); refreshSidebar();
-      $('#ch-q', m.el).innerHTML = `<div class="fh-outcome ${R.score === qs.length ? 'pass' : ''}"><h3>${R.score === qs.length ? '🎯 Chazara gemura!' : '🔁 Chazara done'}</h3><p>${R.score} of ${qs.length} right · +${xp} XP</p>
+      $('#ch-q', m.el).innerHTML = `<div class="fh-outcome ${R.score === qs.length ? 'pass' : ''}"><h3>${R.score === qs.length ? '🎯 Chazara gemura!' : '🔁 Chazara done — shkoyach'}</h3><p>${R.score} of ${qs.length} right · +${xp} XP</p>
         <p class="muted">${R.score === qs.length ? '"Hafoch bah v\'hafoch bah." You turned it over and it held.' : 'The ones you missed will come back in a later chazara. That\'s the point.'}</p></div>`;
       const btns = $('.modal-buttons', m.el); btns.innerHTML = '';
       const b = document.createElement('button'); b.className = 'btn btn-primary'; b.textContent = 'Continue ➜'; b.onclick = () => { m.close(); onDone && onDone(); }; btns.appendChild(b); b.focus();
@@ -14404,7 +14809,7 @@ body.golem-growl::after {
           $$('.cc', box).forEach((x, j) => { x.disabled = true; x.classList.toggle('right', j === q.correct); x.classList.toggle('wrong', j === i && !ok); });
           record(ok, q);
           const r = runRead(q.sql);
-          $('#ch-out', box).innerHTML = (ok ? '<p class="good-t">✓ Right.</p>' : `<p class="bad-t">✗ It's ${esc(q.choices[q.correct])}.</p>`) + (r.error ? '' : tableHtml(r, { max: 20 }));
+          $('#ch-out', box).innerHTML = (ok ? '<p class="good-t">✓ Right — yasher koach.</p>' : `<p class="bad-t">✗ Not quite — it's ${esc(q.choices[q.correct])}.</p>`) + (r.error ? '' : tableHtml(r, { max: 20 }));
           $('#ch-next', box).hidden = false; $('#ch-next', box).focus();
         });
       } else {
@@ -14415,7 +14820,7 @@ body.golem-growl::after {
         let tries = 0;
         function run() {
           let g; try { g = S.grade(q.level || q, ed.value); } catch (e) { g = { pass: false, msg: e.message }; }
-          if (g.pass) { record(true, q); $('#ch-fb', box).innerHTML = '<div class="fb good"><div class="fb-icon">✓</div><div><strong>Still there!</strong></div></div>'; $('#ch-run', box).disabled = true; $('#ch-give', box).hidden = true; $('#ch-next', box).hidden = false; $('#ch-next', box).focus(); }
+          if (g.pass) { record(true, q); $('#ch-fb', box).innerHTML = '<div class="fb good"><div class="fb-icon">✓</div><div><strong>Still there — gevaldig!</strong></div></div>'; $('#ch-run', box).disabled = true; $('#ch-give', box).hidden = true; $('#ch-next', box).hidden = false; $('#ch-next', box).focus(); }
           else { tries++; $('#ch-fb', box).innerHTML = `<div class="fb bad"><div class="fb-icon">✗</div><div>${fmt(g.msg)}${tries >= 2 ? ' <span class="muted">(You can skip — it will come back.)</span>' : ''}</div></div>`; }
         }
         $('#ch-run', box).onclick = run;
@@ -14434,7 +14839,7 @@ body.golem-growl::after {
   function screenDaily() {
     if (trapped()) return screenAttic();
     let p = null; try { p = T.daily(isoToday()); } catch (e) { p = null; }
-    if (!p) return toast('No Daf SQL today.', '');
+    if (!p) return toast('No Daf SQL today. Nu, come back tomorrow.', '');
     if (p.shabbos) return modal({ title: '🕯️🕯️ Gut Shabbos', html: `<p>${esc(p.message)}</p>`, buttons: [{ label: 'OK', cls: 'btn-primary' }] });
     const done = !!state.daily[p.date];
     show('daily', `<div class="level daily">
@@ -14443,7 +14848,7 @@ body.golem-growl::after {
         <p class="muted small">The whole class gets the same puzzle today. ${done ? '<strong>You solved it ✓</strong>' : '+20 XP the first time you solve it.'}</p></section>
       <section class="viewer" id="viewer"></section>
       <section class="work"><div id="editor-box"></div>
-        <div class="controls"><button class="btn btn-primary" id="d-run">▶ Paskan</button><button class="btn" id="d-hint">💡 Hint</button><span class="spacer"></span><button class="btn btn-quiet" id="d-map">🗺️ Map</button></div>
+        <div class="controls"><button class="btn btn-primary" id="d-run">▶ Paskan</button><button class="btn" id="d-hint">💡 Hint (a remez)</button><span class="spacer"></span><button class="btn btn-quiet" id="d-map">🗺️ Map</button></div>
         <div id="hint-box" class="hint-box" hidden></div><div id="feedback" aria-live="polite"></div><div id="results"></div></section></div>`);
     mood('beis');
     setStatus(`${displayName()} · Daf SQL`);
@@ -14456,7 +14861,7 @@ body.golem-growl::after {
       if (g.pass) {
         let extra = '';
         if (!state.daily[p.date]) { state.daily[p.date] = true; state.xp += 20; extra = ' +20 XP'; save(); refreshSidebar(); confetti(); Sound.play('clink'); }
-        $('#feedback').innerHTML = `<div class="fb good"><div class="fb-icon">✓</div><div><strong>Daf SQL done for today!</strong>${extra} <span class="muted">Come back tomorrow for the next one.</span></div></div>`;
+        $('#feedback').innerHTML = `<div class="fb good"><div class="fb-icon">✓</div><div><strong>Daf SQL done for today — shkoyach!</strong>${extra} <span class="muted">Come back tomorrow for the next one, b\'ezras Hashem.</span></div></div>`;
         checkAchievements({ type: 'daily', date: new Date() });
       } else {
         let d = null; try { d = T.diagnose(sql, p, g); } catch (e) { d = null; }
@@ -14518,7 +14923,7 @@ body.golem-growl::after {
       <div class="ask-log" id="ask-log" aria-live="polite"></div>
       <div class="ask-chips" id="ask-chips"></div>
       <form class="ask-form" id="ask-form" autocomplete="off">
-        <input id="ask-in" class="text-in" type="text" maxlength="240" placeholder="Ask a shaila…" aria-label="Your question for Reb Tuvia" spellcheck="true">
+        <input id="ask-in" class="text-in" type="text" maxlength="240" placeholder="Nu, ask a shaila…" aria-label="Your question for Reb Tuvia" spellcheck="true">
         <button class="btn btn-primary" type="submit">Ask</button></form>`;
     document.body.appendChild(el);
     Ask.el = el;
@@ -14585,6 +14990,167 @@ body.golem-growl::after {
     }, reducedMotion() ? 0 : 650);
   }
 
+  /* =================================================================
+     12b. THE CANTEEN (v3.3, student feedback) — spend XP on wardrobe items, niggunim,
+     voices and sound packs. Spending never lowers your madreiga: rank counts XP earned
+     (state.xp); the Canteen spends from what's left (state.xp - state.spent).
+     Some music is also *earned* by finishing acts or reaching endings — those can be
+     bought early, or waited for. Nothing earned by a riddle or an ending is for sale.
+     ================================================================= */
+  const CANTEEN_SECTIONS = [
+    { id: 'track', title: '🎶 Niggunim', blurb: 'Named niggunim — the same melody every time, so you can learn them. Pin one in ⚙️ Settings, or it plays when its mood comes up.' },
+    { id: 'mood', title: '🎼 Music levels', blurb: 'New moods for the game\'s music. Each act you finish opens the next one.' },
+    { id: 'voice', title: '🎤 Voices', blurb: 'Male voices singing wordless niggun syllables — yai-dai-dai, ya-ba-bam. Choose one under ⚙️ Settings → Lead voice.' },
+    { id: 'sounds', title: '🔔 Sound effects', blurb: 'Change what you hear when a query passes or fails.' },
+    { id: 'wear', title: '👔 Wardrobe', blurb: 'For the well-dressed Gabbai HaData.' },
+  ];
+  const CANTEEN = [
+    { id: 't_gabbai', kind: 'track', price: 0, free: true },
+    { id: 't_zemer', kind: 'track', price: 300, earn: { act: 1 } },
+    { id: 't_cholent', kind: 'track', price: 300, earn: { act: 2 } },
+    { id: 't_shtender', kind: 'track', price: 350, earn: { act: 3 } },
+    { id: 't_havdala', kind: 'track', price: 350, earn: { act: 4 } },
+    { id: 't_kumzitz', kind: 'track', price: 350 },
+    { id: 't_golem', kind: 'track', price: 400, earn: { ending: 'genizah' } },
+    { id: 't_siyum', kind: 'track', price: 400, earn: { ending: 'siyum' } },
+    { id: 'zemiros', kind: 'mood', price: 250, earn: { act: 1 } },
+    { id: 'dveikus', kind: 'mood', price: 250, earn: { act: 2 } },
+    { id: 'motzei', kind: 'mood', price: 250, earn: { act: 3 } },
+    { id: 'chazzan', kind: 'voice', price: 400, earn: { act: 2 }, label: 'Chazzan (solo voice)', desc: 'One warm baritone, with a krechts on the long notes.' },
+    { id: 'choir', kind: 'voice', price: 500, earn: { act: 4 }, label: 'Bochurim choir', desc: 'The whole shiur humming together, with the octave below.' },
+    { id: 'shul', kind: 'sounds', price: 200 },
+    { id: 'kapelye', kind: 'sounds', price: 250 },
+    { id: 'bochurim', kind: 'sounds', price: 300 },
+  ];
+  // the wardrobe part of the Canteen comes straight from the avatar catalog (unlock type 'shop')
+  function canteenItems() {
+    const list = CANTEEN.slice();
+    if (AV) Object.keys(AV.CATALOG).forEach(slot => AV.CATALOG[slot].forEach(it => {
+      if (it.unlock && it.unlock.type === 'shop') list.push({ id: it.id, kind: 'wear', price: it.unlock.price || it.unlock.value || 200, label: it.label, slot });
+    }));
+    return list;
+  }
+  function canteenMeta(it) {
+    if (it.kind === 'track') { const tr = Music && (Music.tracks || []).find(t => t.id === it.id); return { label: tr ? tr.label : it.id, desc: tr ? tr.desc : '' }; }
+    if (it.kind === 'mood') { const m = Music && Music.moods.find(x => x.id === it.id); return { label: m ? m.label : it.id, desc: m ? m.desc : '' }; }
+    if (it.kind === 'sounds') { const p = (Sound.packs || []).find(x => x.id === it.id); return { label: p ? p.label : it.id, desc: '' }; }
+    if (it.kind === 'wear') return { label: it.label, desc: SLOT_LABELS[it.slot] ? 'Wardrobe · ' + SLOT_LABELS[it.slot] : 'Wardrobe' };
+    return { label: it.label || it.id, desc: it.desc || '' };
+  }
+  const xpToSpend = () => Math.max(0, (state.xp || 0) - (state.spent || 0));
+  function earnedBy(it) {
+    const e = it.earn; if (!e) return false;
+    if (e.act != null) return actDone(e.act);
+    if (e.ending) return endingsFound().includes(e.ending);
+    return false;
+  }
+  function earnText(e) {
+    if (!e) return '';
+    if (e.act != null) return `Free when you finish Act ${e.act}${S.acts[e.act] ? ' (' + S.acts[e.act].name + ')' : ''}`;
+    if (e.ending) { const E = hasStory() && S.story.ENDINGS ? S.story.ENDINGS.find(x => x.id === e.ending) : null; return `Free when you reach the ending “${E ? E.title : e.ending}”`; }
+    return '';
+  }
+  function ownsItem(id) {
+    if (teacher()) return true;
+    const it = canteenItems().find(x => x.id === id);
+    if (!it) return true; // not a Canteen item: never locked here
+    if (it.free) return true;
+    if ((state.shop.owned || []).includes(id)) return true;
+    if (it.kind === 'wear') return !!(state.avatar && (state.avatar.owned || []).includes(id));
+    return earnedBy(it);
+  }
+  // used by Settings: which moods / niggunim / voices / packs this bochur may choose
+  function musicChoices() {
+    const moods = (Music ? Music.moods : []).filter(m => ownsItem(m.id));
+    const tracks = (Music && Music.tracks ? Music.tracks : []).filter(t => ownsItem(t.id));
+    const voices = ['chazzan', 'choir'].filter(ownsItem);
+    const packs = (Sound.packs || []).filter(p => ownsItem(p.id));
+    return { moods, tracks, voices, packs };
+  }
+  // Keep music settings inside what this bochur owns (the music module remembers settings per browser, not per bochur).
+  function enforceOwned() {
+    try {
+      if (Music && Music.voices && Music.voices.includes(Music.instrument) && !ownsItem(Music.instrument)) Music.setInstrument('ensemble');
+      if (state.settings.musicPin && !ownsItem(state.settings.musicPin)) { state.settings.musicPin = null; if (Music) Music.pin(null); }
+      const pk = state.settings.soundPack || 'classic';
+      if (Sound.setPack) Sound.setPack(ownsItem(pk) ? pk : 'classic');
+    } catch (e) {}
+  }
+  // When finishing an act (or reaching an ending) earns Canteen music, say so once.
+  function notifyEarned() {
+    if (!state.started || teacher()) return;
+    const seen = state.shop.seen || (state.shop.seen = []);
+    const fresh = CANTEEN.filter(it => it.earn && !seen.includes(it.id) && earnedBy(it));
+    if (!fresh.length) return;
+    fresh.forEach(it => seen.push(it.id)); save();
+    toast(`🎁 Free in the Canteen — you earned it: <strong>${fresh.map(it => esc(canteenMeta(it).label)).join(', ')}</strong>. Find it in ⚙️ Settings → Music.`, 'good', 7000);
+  }
+  function buyItem(id) {
+    const it = canteenItems().find(x => x.id === id); if (!it || ownsItem(id)) return false;
+    if (xpToSpend() < it.price) return false;
+    state.spent = (state.spent || 0) + it.price;
+    state.shop.owned = (state.shop.owned || []).concat([id]);
+    if (it.kind === 'wear') { if (!state.avatar) state.avatar = { config: avatarCfg(), owned: [] }; state.avatar.owned = (state.avatar.owned || []).concat([id]); }
+    state.shop.log = (state.shop.log || []).concat([{ id, price: it.price, at: Date.now() }]).slice(-50);
+    save(); refreshSidebar();
+    return true;
+  }
+
+  function openCanteen(tab) {
+    tab = tab || 'track';
+    const silenced = musicSilenced();
+    const items = canteenItems();
+    const card = it => {
+      const mt = canteenMeta(it), own = ownsItem(it.id), can = xpToSpend() >= it.price;
+      const thumb = it.kind === 'wear' && AV ? `<span class="ct-thumb">${AV.thumb(it.slot, it.id, avatarCfg(), { size: 64 })}</span>`
+        : `<span class="ct-ico" aria-hidden="true">${{ track: '🎶', mood: '🎼', voice: '🎤', sounds: '🔔' }[it.kind] || '🛒'}</span>`;
+      const listen = (it.kind === 'track' || it.kind === 'mood') ? `<button class="btn btn-sm btn-quiet ct-listen" data-listen="${esc(it.id)}" ${silenced ? 'disabled' : ''} title="${silenced ? 'Music is off during ' + esc(silenced) : 'Listen for 10 seconds'}">▶ Listen</button>`
+        : it.kind === 'voice' ? `<button class="btn btn-sm btn-quiet ct-listen" data-voice="${esc(it.id)}" ${silenced ? 'disabled' : ''}>▶ Listen</button>`
+        : it.kind === 'sounds' ? `<button class="btn btn-sm btn-quiet ct-listen" data-pack="${esc(it.id)}">▶ Listen</button>` : '';
+      const status = own ? '<span class="ct-own">✓ Yours</span>'
+        : `<button class="btn btn-sm ${can ? 'btn-primary' : ''} ct-buy" data-buy="${esc(it.id)}" ${can ? '' : 'disabled'} title="${can ? '' : 'Not enough XP yet — keep shteiging'}">🪙 ${it.price} XP</button>`;
+      return `<div class="ct-item ${own ? 'owned' : ''}">${thumb}<div class="ct-main"><strong>${esc(mt.label)}</strong>${mt.desc ? `<span class="muted small">${esc(mt.desc)}</span>` : ''}${!own && it.earn ? `<span class="small ct-earn">🎁 ${esc(earnText(it.earn))}</span>` : ''}</div><div class="ct-act">${listen}${status}</div></div>`;
+    };
+    const sec = CANTEEN_SECTIONS.find(x => x.id === tab) || CANTEEN_SECTIONS[0];
+    const m = modal({
+      title: '🛒 The Canteen', wide: true, cls: 'canteen',
+      html: `<p class="ct-wallet">🪙 <strong id="ct-wallet">${xpToSpend()}</strong> XP to spend <span class="muted small">· your madreiga counts all ${state.xp} XP you earned — spending never lowers it.</span></p>
+        ${silenced ? `<p class="warn-box small">🕯️ It's ${esc(silenced)}: music is off, so nothing will play until it's over. You can still buy things for later.</p>` : ''}
+        <div class="otzar-tabs" role="tablist">${CANTEEN_SECTIONS.map(x => `<button class="btn btn-sm ${x.id === sec.id ? 'active' : ''}" data-ct="${x.id}" role="tab" aria-selected="${x.id === sec.id}">${x.title}</button>`).join('')}</div>
+        <p class="muted small">${esc(sec.blurb)}</p>
+        <div class="ct-grid">${items.filter(i => i.kind === sec.id).map(card).join('') || '<p class="muted">Nothing here yet.</p>'}</div>`,
+      buttons: [{ label: 'Close', cls: 'btn-primary' }],
+      noAutofocus: true,
+    });
+    $$('[data-ct]', m.el).forEach(b => b.onclick = () => { m.close(); openCanteen(b.dataset.ct); });
+    $$('[data-buy]', m.el).forEach(b => b.onclick = () => {
+      const it = items.find(x => x.id === b.dataset.buy), mt = canteenMeta(it);
+      modal({
+        title: '🛒 Buy it?', html: `<p><strong>${esc(mt.label)}</strong> for <strong>${it.price} XP</strong>? You'll have ${xpToSpend() - it.price} XP left to spend. (Your madreiga stays the same.)</p>`,
+        buttons: [{ label: 'Not now', onClick: () => { m.close(); openCanteen(sec.id); } }, { label: `Buy — ${it.price} XP`, cls: 'btn-primary', onClick: () => {
+          m.close();
+          if (buyItem(it.id)) {
+            Sound.play('clink'); toast(`🛒 Yours: <strong>${esc(mt.label)}</strong>. Gebentshte shopping!${it.kind === 'wear' ? ' Wear it from the 👔 Wardrobe.' : it.kind === 'sounds' ? ' Switch to it in ⚙️ Settings.' : ' Find it in ⚙️ Settings.'}`, 'good', 6000);
+            if (it.kind === 'sounds') { state.settings.soundPack = it.id; save(); enforceOwned(); }
+          } else toast('Not enough XP for that yet — nu, a few more levels.', 'bad');
+          openCanteen(sec.id);
+        } }],
+      });
+    });
+    $$('[data-listen]', m.el).forEach(b => b.onclick = () => { if (!Music) return; const ok = Music.preview(b.dataset.listen, 10); if (!ok && musicSilenced()) toast(`🕯️ Music is off during ${esc(musicSilenced())}.`, ''); });
+    $$('[data-voice]', m.el).forEach(b => b.onclick = () => {
+      if (!Music) return; const prev = Music.instrument; Music.setInstrument(b.dataset.voice);
+      const ok = Music.preview('t_gabbai', 10);
+      setTimeout(() => { if (Music.instrument === b.dataset.voice && !ownsItem(b.dataset.voice)) Music.setInstrument(prev); }, 10500);
+      if (!ok && musicSilenced()) { Music.setInstrument(prev); toast(`🕯️ Music is off during ${esc(musicSilenced())}.`, ''); }
+    });
+    $$('[data-pack]', m.el).forEach(b => b.onclick = () => {
+      const was = Sound.enabled, prev = Sound.pack; Sound.setEnabled(true); Sound.setPack(b.dataset.pack);
+      Sound.play('clink'); setTimeout(() => Sound.play('fanfare'), 1300);
+      setTimeout(() => { Sound.setPack(prev); if (!was) Sound.setEnabled(false); }, 4200);
+    });
+  }
+
 
   /* =================================================================
      13. FARHERS
@@ -14611,7 +15177,7 @@ body.golem-growl::after {
     renderFarherQ();
     if (timed) {
       tickFarher();
-      F.timer = setInterval(() => { F.timeLeft--; tickFarher(); if (F.timeLeft <= 0) endFarher(false, 'Time is up! ' + fill(f.failText || '')); }, 1000);
+      F.timer = setInterval(() => { F.timeLeft--; tickFarher(); if (F.timeLeft <= 0) endFarher(false, 'Nu, time is up! ' + fill(f.failText || '')); }, 1000);
     }
   }
   function tickFarher() {
@@ -14651,10 +15217,10 @@ body.golem-growl::after {
       $('#fh-fb').innerHTML = `<div class="fb bad"><div class="fb-icon">✗</div><div>${fmt(g.msg)}${d ? `<div class="diag"><strong>🧓 ${esc(d.title)}</strong> ${d.html}</div>` : ''}</div></div>`;
       Sound.play('sigh'); try { $('#fh-fb').scrollIntoView({ block: 'nearest' }); } catch (e) {} return;
     }
-    $('#fh-fb').innerHTML = '<div class="fb good"><div class="fb-icon">✓</div><div><strong>Correct!</strong></div></div>';
+    $('#fh-fb').innerHTML = '<div class="fb good"><div class="fb-icon">✓</div><div><strong>Yasher koach! Correct.</strong></div></div>';
     Sound.play('clink');
     F.i++;
-    if (F.i >= F.f.questions.length) return setTimeout(() => endFarher(true, fill(F.f.passText || 'Yashar koach!')), 500);
+    if (F.i >= F.f.questions.length) return setTimeout(() => endFarher(true, fill(F.f.passText || 'Shkoyach!')), 500);
     setTimeout(renderFarherQ, 700);
   }
   function endFarher(passed, text) {
@@ -14668,8 +15234,8 @@ body.golem-growl::after {
     Eggs.emit({ type: 'farher', id: f.id, passed });
     $('#fh-q').innerHTML = ''; $('.fh-dots').hidden = true;
     const out = $('#fh-out'); out.hidden = false;
-    out.innerHTML = `<div class="fh-outcome ${passed ? 'pass' : 'fail'}"><h3>${passed ? '🏆 Yashar koach!' : '📚 Not this time'}</h3><p>${text}</p>
-      <p class="muted">${passed ? (bonus ? `+${bonus} XP bonus.` : 'Already passed before — no extra points.') : 'You can retake it now, or continue without the bonus and come back to it from the map.'}</p></div>`;
+    out.innerHTML = `<div class="fh-outcome ${passed ? 'pass' : 'fail'}"><h3>${passed ? '🏆 Yasher koach!' : '📚 Not this time — nu, one more chazara'}</h3><p>${text}</p>
+      <p class="muted">${passed ? (bonus ? `+${bonus} XP bonus — mamash a gevaldige shteig.` : 'Already passed before — no extra points.') : 'You can retake it now, b\'ezras Hashem you\'ll get it, or continue without the bonus and come back to it from the map.'}</p></div>`;
     const btns = $('.modal-buttons', F.modal.el); btns.innerHTML = '';
     const add = (label, cls, fn) => { const b = document.createElement('button'); b.className = 'btn ' + cls; b.innerHTML = label; b.onclick = fn; btns.appendChild(b); return b; };
     if (passed) { mood('simcha'); confetti(); Sound.play('fanfare'); avatar('happy', 4000); add('Continue the zman ➜', 'btn-primary', closeF).focus(); checkAchievements({ type: 'farher', id: f.id }); }
@@ -14689,7 +15255,7 @@ body.golem-growl::after {
     state.actShown[a] = 1; save();
     const meta = S.acts[a] || {}, sf = SEFORIM[a] || {}, code = ACT_CODES[a + 1];
     show('act', `<section class="card act-done">
-      <p class="muted">Act ${a} complete</p>
+      <p class="muted">Act ${a} complete — shkoyach!</p>
       <h2>${esc(meta.name || '')} — סִיּוּם!</h2>
       <div class="sefer-earn"><div class="sefer-big">${sf.emoji || '📖'}</div><div><strong>${esc(sf.name || '')}</strong><br><span class="muted">${esc(sf.sub || '')}</span><p>A new sefer for your Otzar: your cheat sheet for everything in this act.</p></div></div>
       ${code ? `<p class="pcode-big">🗝️ Passage code for Act ${a + 1}: <strong>${code}</strong><br><span class="muted small">Use it on another computer to start from Act ${a + 1}.</span></p>` : ''}
@@ -14791,7 +15357,7 @@ body.golem-growl::after {
         try { S.story.reset({ keepEndings: true }); } catch (e) { console.warn(e); }
         state.run = (state.run || 1) + 1; state.path = {}; state.actShown = {}; state.lastLevel = null;
         syncStory(); refreshSidebar();
-        toast(`🔄 Zman ${state.run} begins. Choose differently this time…`, 'good');
+        toast(`🔄 Zman ${state.run} begins. Chap ah rein — choose differently this time…`, 'good');
         openLevel(levels()[0].n);
       } }],
     });
@@ -14884,7 +15450,7 @@ body.golem-growl::after {
   function afterAttic() {
     refreshSidebar(); checkWardrobe();
     if (trapped()) return screenAttic();
-    toast('🕯️ You are out of the Genizah Attic.', 'good');
+    toast('🕯️ Yasher koach — you are out of the Genizah Attic.', 'good');
     // Pick up where the attic interrupted: finish the level's after-steps, or go back to the unsolved level.
     const n = state.lastLevel;
     if (n && S.levelByN(n)) return state.solved[n] ? afterLevel(n, 1) : openLevel(n, { noScene: true });
@@ -14973,7 +15539,7 @@ body.golem-growl::after {
       <div class="otzar-pane" data-pane="m" ${tab === 'm' ? '' : 'hidden'}>${mast}</div>
       <div class="otzar-pane" data-pane="a" ${tab === 'a' ? '' : 'hidden'}>${ach}</div>
       ${ends ? `<div class="otzar-pane" data-pane="end" ${tab === 'end' ? '' : 'hidden'}>${ends}</div>` : ''}
-      <div class="otzar-pane" data-pane="e" ${tab === 'e' ? '' : 'hidden'}><p class="muted">Secrets are hidden all through the yeshiva: in queries, names, clicks, keys and times. Each one you find is a <em>sod</em>.</p><ul class="eggs">${eggs || '<li class="muted">No secrets registered.</li>'}</ul></div>`,
+      <div class="otzar-pane" data-pane="e" ${tab === 'e' ? '' : 'hidden'}><p class="muted">Secrets are hidden all through the yeshiva: in queries, names, clicks, keys and times. Each one you find is a <em>sod</em>.</p><ul class="eggs">${eggs || '<li class="muted">No sodos (secrets) registered yet.</li>'}</ul></div>`,
       buttons: (CAN_PRINT ? [{ label: '🖨️ Print the Kitzur SQL Aruch', close: false, onClick: printKitzur }] : []).concat([{ label: 'Close', cls: 'btn-primary' }]),
     });
     $$('.otzar-tabs .btn[data-tab]', m.el).forEach(b => b.onclick = () => {
@@ -14988,7 +15554,7 @@ body.golem-growl::after {
       <h1>קיצור SQL ערוך · Kitzur SQL Aruch</h1><p style="text-align:center">${esc(S.SCHOOL)} · for ${esc(displayName())}</p>
       ${actList().filter(a => actDone(a) || teacher()).map(a => SEFORIM[a] ? `<h2>${SEFORIM[a].emoji} ${esc(SEFORIM[a].name)} — ${esc(SEFORIM[a].sub)}</h2>${SEFORIM[a].html}` : '').join('') || '<p style="text-align:center">No seforim earned yet — finish an act to add its page.</p>'}</body></html>`;
     if (w) { w.document.write(html); w.document.close(); setTimeout(() => { try { w.print(); } catch (e) {} }, 300); }
-    else toast('Your browser blocked the print window.', 'bad');
+    else toast('Nu, your browser blocked the print window.', 'bad');
   }
 
   /* ---------- Report a problem: a ready-to-paste note for the class forum ---------- */
@@ -15029,25 +15595,29 @@ body.golem-growl::after {
   function openSettings() {
     const s = state.settings;
     const silenced = musicSilenced();
-    const moods = Music ? Music.moods : [];
+    const mc = musicChoices(), moods = mc.moods;
+    const INST = { strings: 'Strings', clarinet: 'Clarinet', violin: 'Violin', ensemble: 'Kapelye (ensemble)', chazzan: '🎤 Chazzan (male voice)', choir: '🎤 Bochurim choir (male voices)' };
     const m = modal({
       title: '⚙️ Settings', wide: true, html: `
       <div class="settings-grid">
-      <section><h3>🎵 Music</h3>
+      <section><h3>🎵 Music (niggunim)</h3>
         ${silenced ? `<p class="cal-note">🕯️ Music is off during ${esc(silenced)}. It will come back on by itself afterwards.</p>` : ''}
         <label class="sw"><input type="checkbox" id="st-music" ${s.music ? 'checked' : ''} ${Music ? '' : 'disabled'}> Play music</label>
         <label class="lbl" for="st-vol">Music volume</label><input type="range" id="st-vol" min="0" max="100" value="${Math.round(((Music && Music.volume) || .6) * 100)}" ${Music ? '' : 'disabled'}>
         <label class="lbl" for="st-mood">Mood</label>
-        <select id="st-mood" class="text-in" ${Music ? '' : 'disabled'}><option value="">Follow the game</option>${moods.map(mm => `<option value="${mm.id}" ${s.musicPin === mm.id ? 'selected' : ''}>${esc(mm.label)}</option>`).join('')}</select>
+        <select id="st-mood" class="text-in" ${Music ? '' : 'disabled'}><option value="">Follow the game</option><optgroup label="Moods">${moods.map(mm => `<option value="${mm.id}" ${s.musicPin === mm.id ? 'selected' : ''}>${esc(mm.label)}</option>`).join('')}</optgroup>${mc.tracks.length ? `<optgroup label="Niggunim">${mc.tracks.map(tr => `<option value="${tr.id}" ${s.musicPin === tr.id ? 'selected' : ''}>🎶 ${esc(tr.label)}</option>`).join('')}</optgroup>` : ''}</select>
         <div class="mood-prev">${moods.map(mm => `<button class="btn btn-sm" data-prev="${mm.id}" title="${esc(mm.desc)}" ${silenced ? 'disabled' : ''}>▶ ${esc(mm.label)}</button>`).join('')}</div>
-        <label class="lbl" for="st-inst">Instruments</label>
-        <select id="st-inst" class="text-in" ${Music ? '' : 'disabled'}>${['strings', 'clarinet', 'violin', 'ensemble'].map(i => `<option value="${i}" ${Music && Music.instrument === i ? 'selected' : ''}>${{ strings: 'Strings', clarinet: 'Clarinet', violin: 'Violin', ensemble: 'Kapelye (ensemble)' }[i]}</option>`).join('')}</select>
+        <label class="lbl" for="st-inst">Lead voice</label>
+        <select id="st-inst" class="text-in" ${Music ? '' : 'disabled'}>${['strings', 'clarinet', 'violin', 'ensemble'].concat(mc.voices).map(i => `<option value="${i}" ${Music && Music.instrument === i ? 'selected' : ''}>${INST[i]}</option>`).join('')}</select>
         <label class="lbl" for="st-tempo">Tempo</label>
         <select id="st-tempo" class="text-in" ${Music ? '' : 'disabled'}>${['calm', 'normal', 'lively'].map(t => `<option value="${t}" ${Music && Music.tempo === t ? 'selected' : ''}>${t[0].toUpperCase() + t.slice(1)}</option>`).join('')}</select>
-        <p class="muted small">Original instrumental niggunim in Jewish modes, composed live by your browser. Silent during Sefira and the Three Weeks.</p>
+        <p class="muted small">Original niggunim in Jewish modes, composed live by your browser — instruments, or male voices singing yai-dai-dai. Silent during Sefira and the Three Weeks.</p>
+        <div class="row-btns"><button class="btn btn-sm" id="st-canteen">🛒 More music in the Canteen</button></div>
       </section>
       <section><h3>🔔 Sound &amp; display</h3>
         <label class="sw"><input type="checkbox" id="st-sound" ${s.sound ? 'checked' : ''}> Sound effects (clink, sigh, shofar)</label>
+        <label class="lbl" for="st-pack">Sound pack</label>
+        <select id="st-pack" class="text-in">${mc.packs.map(p => `<option value="${p.id}" ${(s.soundPack || 'classic') === p.id ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select>
         <label class="sw"><input type="checkbox" id="st-big" ${s.bigText ? 'checked' : ''}> Larger text</label>
         <label class="sw"><input type="checkbox" id="st-motion" ${s.reduceMotion ? 'checked' : ''}> Less motion (no typewriter, no confetti)</label>
         <label class="sw"><input type="checkbox" id="st-teach" ${Object.keys(state.tutor.skipActs).length ? '' : 'checked'}> Teach me step by step (Shiur, Kasha, Chavrusa)</label>
@@ -15061,7 +15631,7 @@ body.golem-growl::after {
         <div class="row-btns"><button class="btn btn-sm" id="st-voice-test">▶ Test the voice</button></div>
         <p class="muted small">Uses your computer's built-in voice, so it sounds different on each computer. Speaking is allowed in Sefira and the Three Weeks.</p>`
         : '<p class="muted small">This browser has no built-in voice. Chrome or Edge on a computer usually has one.</p>'}
-        <h3>🧑 You</h3>
+        <h3>🧑 You, the bochur</h3>
         <div class="row-btns"><button class="btn btn-sm" id="st-me">✏️ My character</button>${AV ? '<button class="btn btn-sm" id="st-wardrobe">👔 Wardrobe</button>' : ''}</div>
       </section>
       </div>
@@ -15084,6 +15654,8 @@ body.golem-growl::after {
     $('#st-tempo', el).onchange = e => { if (Music) Music.setTempo(e.target.value); };
     $$('[data-prev]', el).forEach(b => b.onclick = () => { if (!Music) return; const ok = Music.preview(b.dataset.prev, 8); if (!ok && musicSilenced()) toast(`🕯️ Music is off during ${esc(musicSilenced())}.`, ''); });
     $('#st-sound', el).onchange = e => setSound(e.target.checked);
+    $('#st-pack', el).onchange = e => { s.soundPack = e.target.value; save(); enforceOwned(); Sound.play('clink'); };
+    $('#st-canteen', el).onclick = () => { m.close(); openCanteen('track'); };
     $('#st-big', el).onchange = e => { s.bigText = e.target.checked; save(); refreshSidebar(); };
     $('#st-motion', el).onchange = e => { s.reduceMotion = e.target.checked; save(); refreshSidebar(); };
     $('#st-teach', el).onchange = e => { if (e.target.checked) state.tutor.skipActs = {}; else actList().forEach(a => { state.tutor.skipActs[a] = true; }); state.tutor.taught = e.target.checked ? {} : state.tutor.taught; save(); };
@@ -15091,7 +15663,7 @@ body.golem-growl::after {
     $('#st-me', el).onclick = () => { m.close(); screenSetup('edit'); };
     const wb = $('#st-wardrobe', el); if (wb) wb.onclick = () => { m.close(); openWardrobe(); };
     $('#st-copy', el).onclick = () => { const t = $('#st-code', el); t.select(); try { navigator.clipboard.writeText(t.value).then(() => toast('Copied!', 'good'), () => document.execCommand('copy')); } catch (e) { document.execCommand('copy'); } };
-    $('#st-load', el).onclick = () => { try { importCode($('#st-import', el).value); m.close(); refreshSidebar(); avatar('neutral'); toast('Progress loaded. Welcome back, ' + esc(displayName()) + '!', 'good'); continueGame(); } catch (e) { console.warn(e); $('#st-err', el).textContent = 'That code could not be read. Copy the whole thing, starting with SQLS.'; } };
+    $('#st-load', el).onclick = () => { try { importCode($('#st-import', el).value); m.close(); refreshSidebar(); avatar('neutral'); toast('Progress loaded. Welcome back, ' + esc(displayName()) + ' — shkoyach!', 'good'); continueGame(); } catch (e) { console.warn(e); $('#st-err', el).textContent = 'Nu, that code could not be read. Copy the whole thing, starting with SQLS.'; } };
     if (Voice.ok) {
       $('#st-voice', el).onchange = e => { s.voice = e.target.checked; save(); if (!s.voice) Voice.stop(); };
       $('#st-voice-auto', el).onchange = e => { s.voiceAuto = e.target.checked; save(); };
@@ -15102,7 +15674,7 @@ body.golem-growl::after {
     $('#st-report', el).onclick = () => { m.close(); openReport(); };
     $('#st-teacher', el).onclick = () => { m.close(); promptTeacher(); };
     $('#st-code-btn', el).onclick = () => { m.close(); promptPassage(); };
-    $('#st-reset', el).onclick = () => { m.close(); modal({ title: 'Erase all progress?', html: '<p>Everything saved in this browser will be erased — even inside the Genizah Attic. This cannot be undone.</p>', buttons: [{ label: 'Cancel' }, { label: 'Erase', cls: 'btn-danger', onClick: () => { Store.del(SAVE_KEY); Store.del(OLD_SAVE_KEY); resetAll(true); } }] }); };
+    $('#st-reset', el).onclick = () => { m.close(); modal({ title: 'Erase all progress?', html: '<p>Every bochur\'s progress saved in this browser will be erased — even inside the Genizah Attic. This cannot be undone. (To erase only one bochur, use <em>Not you? Sign in</em> on the title screen.)</p>', buttons: [{ label: 'Cancel' }, { label: 'Erase', cls: 'btn-danger', onClick: () => { Store.del(SAVE_KEY); Store.del(OLD_SAVE_KEY); Object.keys(profileDir().list).forEach(deleteProfile); Store.del(PROFILES_KEY); resetAll(true); } }] }); };
   }
   function setSound(on) { state.settings.sound = !!on; Sound.setEnabled(!!on); if (Sound.stopHum) Sound.stopHum(); save(); refreshSidebar(); if (on) Sound.play('clink'); }
   function setMusic(on) {
@@ -15130,6 +15702,8 @@ body.golem-growl::after {
     $('#drawer-scrim').onclick = closeDrawer;
     $('#btn-map').onclick = () => { if (!state.player && !state.name) return screenTitle(); if (trapped()) return screenAttic(); screenMap(); };
     $('#btn-otzar').onclick = () => openOtzar();
+    $('#btn-canteen').onclick = () => { if (!state.started) return toast('Begin the zman first — then you\'ll have XP to spend.', ''); openCanteen(); };
+    $('#spend-btn').onclick = () => { if (state.started) openCanteen(); };
     $('#side-otzar-title').addEventListener('click', () => openOtzar());
     $('#avatar-wrap').addEventListener('click', () => { if (state.started) openWardrobe(); });
     $('#btn-sound').onclick = () => setSound(!state.settings.sound);
